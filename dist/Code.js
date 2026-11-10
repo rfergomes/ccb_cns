@@ -61,6 +61,13 @@ function doGet(e) {
       ? String(e.parameter.evento || e.parameter.idEvento).trim()
       : '';
 
+  const requestedCredencialId =
+    e && e.parameter && (e.parameter.credencial || e.parameter.inscricao || e.parameter.idInscricao)
+      ? String(
+          e.parameter.credencial || e.parameter.inscricao || e.parameter.idInscricao
+        ).trim()
+      : '';
+
   let currentView = 'portal';
   if (rawView === 'admin') {
     currentView = 'admin';
@@ -75,23 +82,29 @@ function doGet(e) {
   let initialBootstrapData = {
     view: currentView,
     requestedEventoId,
+    requestedCredencialId,
     hasActiveEvent: false,
     activeEvent: null,
     activeEvents: [],
     googleSessionMatch: null,
+    initialVoucher: null,
     metadata: Environment.getPublicMetadata(),
     configError: null
   };
 
   try {
     const inscriptionService = new InscriptionService();
-    const portalState = inscriptionService.getPortalState(requestedEventoId);
+    const portalState = inscriptionService.getPortalState(
+      requestedEventoId,
+      requestedCredencialId
+    );
     initialBootstrapData = {
       ...initialBootstrapData,
       hasActiveEvent: portalState.hasActiveEvent,
       activeEvent: portalState.activeEvent,
       activeEvents: portalState.activeEvents,
       googleSessionMatch: portalState.googleSessionMatch,
+      initialVoucher: portalState.initialVoucher,
       metadata: portalState.metadata
     };
   } catch (err) {
@@ -103,7 +116,11 @@ function doGet(e) {
 
   const template = createHtmlTemplateSafe_('Index');
   template.initialView = currentView;
-  template.bootstrapJson = JSON.stringify(initialBootstrapData);
+  template.bootstrapJson = JSON.stringify(initialBootstrapData)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 
   let pageTitle = 'Agenda CNS | Convocação e Credenciamento - CCB Regional Campinas';
   if (currentView === 'admin') {
@@ -126,11 +143,23 @@ function doGet(e) {
 /**
  * Consulta o estado atualizado do Portal Público e de Auto-Credenciamento.
  * @param {string} [preferredEventoId] UUID opcional do evento.
+ * @param {string} [credentialUuid] UUID opcional da inscrição.
  * @returns {Object} Estado do portal.
  */
-function apiGetPortalState(preferredEventoId) {
+function apiGetPortalState(preferredEventoId, credentialUuid) {
   const service = new InscriptionService();
-  return service.getPortalState(preferredEventoId || '');
+  return service.getPortalState(preferredEventoId || '', credentialUuid || '');
+}
+
+/**
+ * Recupera os dados do comprovante e QR Code de uma inscrição pelo seu UUID.
+ *
+ * @param {string} idInscricao UUID da inscrição.
+ * @returns {Object|null} Dados do comprovante para renderização do QR Code.
+ */
+function apiGetVoucherById(idInscricao) {
+  const service = new InscriptionService();
+  return service.getVoucherById(idInscricao);
 }
 
 /**

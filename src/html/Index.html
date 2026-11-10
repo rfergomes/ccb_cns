@@ -462,6 +462,9 @@
           </div>
 
           <div class="d-flex flex-wrap justify-content-center gap-2 no-print mobile-stack-buttons">
+            <button type="button" id="btn-voucher-whatsapp" class="btn btn-success fw-semibold">
+              <i class="bi bi-whatsapp me-1"></i>Enviar para Meu WhatsApp
+            </button>
             <button type="button" id="btn-voucher-download" class="btn btn-ccb-success">
               <i class="bi bi-download me-1"></i>Salvar QR Code (PNG)
             </button>
@@ -1325,7 +1328,10 @@
           <div id="admin-qr-canvas" class="qr-canvas-box mb-2"></div>
           <div><code id="admin-qr-uuid" class="small">—</code></div>
         </div>
-        <div class="modal-footer bg-light">
+        <div class="modal-footer bg-light d-flex justify-content-between">
+          <button type="button" id="btn-admin-qr-whatsapp" class="btn btn-success btn-sm fw-semibold">
+            <i class="bi bi-whatsapp me-1"></i>Enviar p/ WhatsApp do Participante
+          </button>
           <button type="button" class="btn btn-ccb-outline btn-sm" data-bs-dismiss="modal">Fechar</button>
         </div>
       </div>
@@ -1389,6 +1395,59 @@
           </button>
           <button type="button" id="btn-print-poster" class="btn btn-ccb-primary btn-sm">
             <i class="bi bi-printer me-1"></i>Imprimir Cartaz de Recepção
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 5: ENVIAR CONVOCAÇÃO / CONVITE PARA GRUPO DE WHATSAPP (CNS - CAMPINAS)
+       ===================================================================== -->
+  <div class="modal fade" id="modal-whatsapp-evento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header ccb-card-header no-print">
+          <h3 class="modal-title fs-5 text-white">
+            <i class="bi bi-whatsapp me-2"></i>Enviar Convite para Grupo de WhatsApp (CNS - Campinas)
+          </h3>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="alert alert-light border small mb-3">
+            <i class="bi bi-info-circle-fill me-1 text-primary"></i>
+            Selecione o modelo oficial de mensagem da <strong>CNS — Regional Campinas</strong>, revise ou complemente o texto abaixo se desejar e clique em <strong>Abrir no WhatsApp Web / App</strong> para selecionar o grupo <strong>CNS - Campinas</strong>.
+          </div>
+
+          <div class="mb-3">
+            <label for="wa-evento-modelo" class="form-label fw-bold">
+              Modelo de Mensagem Oficial (Padrão CNS Campinas):
+            </label>
+            <select id="wa-evento-modelo" class="form-select">
+              <option value="COMPLETA">Modelo 1: Convocação Oficial Completa (Cabeçalho CCB/CNS, Público-Alvo, Local e Link)</option>
+              <option value="LEMBRETE">Modelo 2: Lembrete Rápido — Confirmação de Presença / Preparação da Alimentação</option>
+            </select>
+          </div>
+
+          <div class="mb-2">
+            <label for="wa-evento-mensagem" class="form-label fw-bold">
+              Texto da Mensagem para o WhatsApp:
+            </label>
+            <textarea
+              id="wa-evento-mensagem"
+              class="form-control font-monospace"
+              rows="13"
+              style="font-size: 0.86rem; line-height: 1.45;"
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" id="btn-copy-wa-evento" class="btn btn-ccb-outline btn-sm">
+            <i class="bi bi-clipboard me-1"></i>Copiar Mensagem
+          </button>
+          <button type="button" id="btn-send-wa-evento" class="btn btn-success btn-sm fw-semibold">
+            <i class="bi bi-whatsapp me-1"></i>Abrir no WhatsApp Web / App
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
         </div>

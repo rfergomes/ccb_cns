@@ -695,11 +695,105 @@
     function resolveEventMapUrl(ev) {
       if (!ev) return 'https://www.google.com/maps';
       const customLink = String(ev.LINK_MAPA || '').trim();
-      if (/^https?:\/\/\S+$/i.test(customLink)) {
+      const lowerLink = customLink.toLowerCase();
+      if (
+        (lowerLink.indexOf('http://') === 0 || lowerLink.indexOf('https://') === 0) &&
+        customLink.indexOf(' ') === -1
+      ) {
         return customLink;
       }
       const query = String(ev.LOCAL || 'Campinas SP').trim();
-      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+      return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
+    }
+
+    /**
+     * Retorna a URL base canônica do Web App para composição de links externos (WhatsApp / QR Code).
+     * @returns {string}
+     */
+    function getWebAppBaseUrl() {
+      return (
+        (AppState.portal.metadata && AppState.portal.metadata.webAppUrl) ||
+        window.location.href.split('?')[0]
+      );
+    }
+
+    /**
+     * Retorna o dia da semana por extenso em português a partir de uma data ISO (YYYY-MM-DD).
+     * @param {string} isoDateStr Data no formato YYYY-MM-DD.
+     * @returns {string}
+     */
+    function getWeekdayNamePtBr(isoDateStr) {
+      if (!isoDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(String(isoDateStr).trim())) {
+        return 'dia da reunião';
+      }
+      const [y, m, d] = String(isoDateStr)
+        .trim()
+        .split('-')
+        .map((n) => parseInt(n, 10));
+      const dt = new Date(y, m - 1, d, 12, 0, 0);
+      const dias = [
+        'domingo',
+        'segunda-feira',
+        'terça-feira',
+        'quarta-feira',
+        'quinta-feira',
+        'sexta-feira',
+        'sábado'
+      ];
+      return dias[dt.getDay()] || 'dia da reunião';
+    }
+
+    /**
+     * Normaliza um telefone brasileiro para o formato internacional exigido pela API Web do WhatsApp (55 + DDD + Número).
+     * @param {string} rawPhone Telefone informado.
+     * @returns {string} Dígitos com DDI 55 ou string vazia se inválido.
+     */
+    function normalizeWhatsappPhoneBr(rawPhone) {
+      const digits = String(rawPhone || '').replace(/\D/g, '');
+      if (digits.length === 10 || digits.length === 11) {
+        return `55${digits}`;
+      }
+      if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
+        return digits;
+      }
+      return '';
+    }
+
+    const WA_ICONS = {
+      check: String.fromCodePoint(0x2705),
+      pin: String.fromCodePoint(0x1f4cc),
+      calendar: String.fromCodePoint(0x1f4c5),
+      clock: String.fromCodePoint(0x1f552),
+      coffee: String.fromCodePoint(0x2615),
+      loc: String.fromCodePoint(0x1f4cd),
+      map: String.fromCodePoint(0x1f5fa, 0xfe0f),
+      user: String.fromCodePoint(0x1f464),
+      city: String.fromCodePoint(0x1f3d9, 0xfe0f),
+      role: String.fromCodePoint(0x1f4bc),
+      key: String.fromCodePoint(0x1f511),
+      phone: String.fromCodePoint(0x1f4f2),
+      point: String.fromCodePoint(0x1f449),
+      nl: String.fromCharCode(10)
+    };
+
+    /**
+     * Constrói a URL oficial da API Web do WhatsApp (`https://api.whatsapp.com/send`).
+     * @param {string} message Texto da mensagem.
+     * @param {string} [phoneWithDdi=''] Número com DDI (ex: 5519999999999). Se vazio, permite escolher o contato/grupo.
+     * @returns {string}
+     */
+    function buildWhatsappApiUrl(message, phoneWithDdi = '') {
+      const encodedText = encodeURIComponent(String(message || ''));
+      const cleanPhone = String(phoneWithDdi || '').replace(/\D/g, '');
+      if (cleanPhone) {
+        return (
+          'https://api.whatsapp.com/send?phone=' +
+          encodeURIComponent(cleanPhone) +
+          '&text=' +
+          encodedText
+        );
+      }
+      return 'https://api.whatsapp.com/send?text=' + encodedText;
     }
 
     /**
@@ -826,12 +920,19 @@
 
         playBeepSound('success');
         toastr.success(response.message);
-        Swal.fire({
+        const swalRes = await Swal.fire({
           title: 'Credencial Emitida!',
           text: response.message,
           icon: 'success',
-          confirmButtonColor: '#033D60'
+          showDenyButton: true,
+          confirmButtonColor: '#033D60',
+          denyButtonColor: '#198754',
+          confirmButtonText: 'Ver Meu QR Code',
+          denyButtonText: '<i class="bi bi-whatsapp me-1"></i>Enviar p/ Meu WhatsApp'
         });
+        if (swalRes.isDenied) {
+          sendVoucherToParticipantWhatsapp(response);
+        }
       } catch (err) {
         setLoading(false);
         toastr.error(err.message);
@@ -900,6 +1001,92 @@
       }
 
       switchView('portal');
+    }
+
+    /**
+     * Envia os dados da inscrição e o link direto da Credencial QR Code para o WhatsApp
+     * do próprio participante utilizando a API Web do WhatsApp (`https://api.whatsapp.com/send`).
+     *
+     * @param {Object} voucherData Objeto contendo `{ inscricao, evento }`.
+     */
+    async function sendVoucherToParticipantWhatsapp(voucherData) {
+      if (!voucherData || !voucherData.inscricao) {
+        toastr.warning('Nenhuma inscrição selecionada para envio ao WhatsApp.');
+        return;
+      }
+
+      const { inscricao, evento } = voucherData;
+      const baseUrl = getWebAppBaseUrl();
+      const credencialUrl = `${baseUrl}?view=portal&credencial=${encodeURIComponent(
+        inscricao.ID_INSCRICAO
+      )}`;
+      const checkinUrl =
+        evento && evento.ID_EVENTO
+          ? `${baseUrl}?view=checkin&evento=${encodeURIComponent(evento.ID_EVENTO)}`
+          : `${baseUrl}?view=checkin`;
+
+      const tituloEv = evento && evento.TITULO ? evento.TITULO : 'Reunião Geral da CNS';
+      const dataEv =
+        evento && evento.DATA_EVENTO
+          ? `${formatDateBr(evento.DATA_EVENTO)} (${getWeekdayNamePtBr(evento.DATA_EVENTO)})`
+          : '—';
+      const horaEv = evento && evento.HORA_EVENTO ? `${evento.HORA_EVENTO}h` : '—';
+      const lancheEv = evento && evento.HORA_LANCHE ? `${evento.HORA_LANCHE}h` : '—';
+      const localEv = evento && evento.LOCAL ? evento.LOCAL : '—';
+      const mapUrl = resolveEventMapUrl(evento);
+
+      const message = [
+        '*CONGREGAÇÃO CRISTÃ NO BRASIL*',
+        '*Agenda CNS — Regional Campinas/SP*',
+        `${WA_ICONS.check} *COMPROVANTE DE INSCRIÇÃO E CREDENCIAL QR CODE*`,
+        '',
+        `A Paz de Deus, *${inscricao.NOME_COMPLETO}*!`,
+        'Sua inscrição foi registrada com sucesso. Confira abaixo os dados da sua convocação e o link direto do seu QR Code:',
+        '',
+        `${WA_ICONS.pin} *Reunião:* ${tituloEv}`,
+        `${WA_ICONS.calendar} *Data:* ${dataEv}`,
+        `${WA_ICONS.clock} *Início da Reunião:* ${horaEv}`,
+        `${WA_ICONS.coffee} *Lanche / Recepção:* ${lancheEv}`,
+        `${WA_ICONS.loc} *Local:* ${localEv}`,
+        `${WA_ICONS.map} *Mapa:* ${mapUrl}`,
+        '',
+        `${WA_ICONS.user} *Participante:* ${inscricao.NOME_COMPLETO}`,
+        `${WA_ICONS.city} *Cidade:* ${inscricao.CIDADE || '—'}`,
+        `${WA_ICONS.role} *Função:* ${inscricao.FUNCAO || '—'}`,
+        `${WA_ICONS.key} *Código UUID:* ${inscricao.ID_INSCRICAO}`,
+        '',
+        `${WA_ICONS.phone} *ABRIR MEU QR CODE DE CREDENCIAMENTO:*`,
+        credencialUrl,
+        '',
+        `${WA_ICONS.loc} *Link de Auto Check-in Online (no dia da reunião):*`,
+        checkinUrl
+      ].join(WA_ICONS.nl);
+
+      let phoneWithDdi = normalizeWhatsappPhoneBr(inscricao.TELEFONE);
+
+      if (!phoneWithDdi) {
+        const promptRes = await Swal.fire({
+          title: 'Enviar Comprovante para WhatsApp',
+          html: `
+            <div class="text-start small mb-2">
+              Informe o número do WhatsApp com DDD para enviar diretamente a credencial e o link do QR Code (ou deixe em branco para selecionar o contato no WhatsApp):
+            </div>
+          `,
+          input: 'tel',
+          inputPlaceholder: '(19) 99999-9999',
+          showCancelButton: true,
+          confirmButtonColor: '#198754',
+          cancelButtonColor: '#49656C',
+          confirmButtonText: '<i class="bi bi-whatsapp me-1"></i>Abrir WhatsApp',
+          cancelButtonText: 'Cancelar'
+        });
+
+        if (!promptRes.isConfirmed) return;
+        phoneWithDdi = normalizeWhatsappPhoneBr(promptRes.value || '');
+      }
+
+      const waUrl = buildWhatsappApiUrl(message, phoneWithDdi);
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
     }
 
     /**
@@ -1742,6 +1929,14 @@
                 <div class="btn-group btn-group-sm">
                   <button
                     type="button"
+                    class="btn btn-success js-btn-whatsapp-evento"
+                    data-id="${escapeHtml(ev.ID_EVENTO)}"
+                    title="Enviar Convite de Inscrição no Grupo de WhatsApp (CNS - Campinas)"
+                  >
+                    <i class="bi bi-whatsapp me-1"></i>WhatsApp
+                  </button>
+                  <button
+                    type="button"
                     class="btn btn-ccb-success js-btn-poster-evento"
                     data-id="${escapeHtml(ev.ID_EVENTO)}"
                     title="Gerar QR Code e Link de Auto-Credenciamento do Evento"
@@ -1790,9 +1985,7 @@
     function openEventoPosterModal(evento) {
       if (!evento) return;
 
-      const baseUrl =
-        (AppState.portal.metadata && AppState.portal.metadata.webAppUrl) ||
-        window.location.href.split('?')[0];
+      const baseUrl = getWebAppBaseUrl();
       const checkinLink = `${baseUrl}?view=checkin&evento=${encodeURIComponent(evento.ID_EVENTO)}`;
 
       document.getElementById('poster-ev-titulo').textContent = evento.TITULO;
@@ -1816,6 +2009,90 @@
       }
 
       const modalEl = document.getElementById('modal-evento-poster');
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    /**
+     * Monta o texto de convite de inscrição para o grupo de WhatsApp "CNS - Campinas",
+     * seguindo os modelos oficiais adotados pela Regional Administrativa de Campinas/SP.
+     *
+     * @param {Object} evento Objeto do evento.
+     * @param {string} [templateType='COMPLETA'] 'COMPLETA' | 'LEMBRETE'
+     * @returns {string}
+     */
+    function buildWhatsappEventoInviteText(evento, templateType = 'COMPLETA') {
+      if (!evento) return '';
+
+      const dataBr = formatDateBr(evento.DATA_EVENTO);
+      const diaSemana = getWeekdayNamePtBr(evento.DATA_EVENTO);
+      const horaReuniao = evento.HORA_EVENTO || '—';
+      const horaLanche = evento.HORA_LANCHE || '—';
+      const local = evento.LOCAL || '—';
+      const mapUrl = resolveEventMapUrl(evento);
+      const portalUrl = `${getWebAppBaseUrl()}?view=portal`;
+
+      if (templateType === 'LEMBRETE') {
+        return [
+          'A Paz de Deus a todos, meus caros irmãos.',
+          '',
+          `Peço a gentileza de confirmação da presença para reunião da CNS do dia *${dataBr}* (${diaSemana}, às *${horaReuniao}h*).`,
+          `${WA_ICONS.loc} *Local:* ${local}`,
+          `${WA_ICONS.coffee} *Serviço de Alimentação / Lanche:* ${horaLanche}h`,
+          `${WA_ICONS.map} *Mapa:* ${mapUrl}`,
+          '*(Motivo: preparação da alimentação)*',
+          '',
+          `${WA_ICONS.point} *Confirme sua presença e emita sua credencial pelo link:*`,
+          portalUrl
+        ].join(WA_ICONS.nl);
+      }
+
+      return [
+        '*CONGREGAÇÃO CRISTÃ NO BRASIL*',
+        '*COMISSÃO DE NEGOCIADORES DE SUPRIMENTOS — CNS*',
+        '*REGIONAL ADMINISTRATIVA DE CAMPINAS/SP — RAC*',
+        '',
+        `*CONVOCAÇÃO — ${evento.TITULO || 'REUNIÃO GERAL PRESENCIAL DA CNS'}*`,
+        '',
+        'Caros irmãos e irmãs, a Paz de Deus.',
+        '',
+        'Convidamos para a próxima *Reunião Geral Presencial da CNS* na Regional Campinas:',
+        '• *ANCIÃES e DIÁCONOS* (Membros das Reuniões Regionais de Ensinamentos — RRE da Regional Campinas);',
+        '• *Membros da Administração* de todas as Administrações que compõem a Regional de Campinas;',
+        '• *Grupos de trabalho da CNS:* Coordenadores, Compradores, Negociadores e Secretários.',
+        '',
+        `${WA_ICONS.calendar} *Dia:* ${dataBr} (${diaSemana}, às *${horaReuniao}h*)`,
+        `${WA_ICONS.coffee} *Serviço de Alimentação / Lanche:* ${horaLanche}h`,
+        `${WA_ICONS.loc} *Local:* ${local}`,
+        `${WA_ICONS.map} *Localização (Mapa):* ${mapUrl}`,
+        '',
+        `${WA_ICONS.point} *Confirmação de Presença / Inscrição Online (para preparação da alimentação e emissão do QR Code):*`,
+        portalUrl,
+        '',
+        'Contamos com a presença de todos e a habitual pontualidade.',
+        'Vossos irmãos em Cristo que vos saúdam.',
+        '',
+        '*Coordenação da CNS da Regional Administrativa de Campinas*'
+      ].join(WA_ICONS.nl);
+    }
+
+    /**
+     * Abre o modal para revisar, copiar ou enviar a convocação no grupo de WhatsApp (CNS - Campinas).
+     * @param {Object} evento Objeto do evento selecionado.
+     */
+    function openWhatsappEventoModal(evento) {
+      if (!evento) return;
+      AppState.admin.selectedWhatsappEvento = evento;
+
+      const selectEl = document.getElementById('wa-evento-modelo');
+      const textareaEl = document.getElementById('wa-evento-mensagem');
+      if (selectEl) {
+        selectEl.value = 'COMPLETA';
+      }
+      if (textareaEl) {
+        textareaEl.value = buildWhatsappEventoInviteText(evento, 'COMPLETA');
+      }
+
+      const modalEl = document.getElementById('modal-whatsapp-evento');
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -2274,6 +2551,24 @@
       document.getElementById('admin-qr-detalhes').textContent = detalhes;
       document.getElementById('admin-qr-uuid').textContent = idInscricao;
 
+      const bundle = AppState.admin.bundle || {};
+      const foundIns = (bundle.inscricoes || []).find((i) => i.ID_INSCRICAO === idInscricao);
+      const foundEv = foundIns
+        ? (bundle.eventos || []).find((e) => e.ID_EVENTO === foundIns.ID_EVENTO)
+        : null;
+      AppState.admin.selectedParticipantForQr = foundIns
+        ? { inscricao: foundIns, evento: foundEv }
+        : {
+            inscricao: {
+              ID_INSCRICAO: idInscricao,
+              NOME_COMPLETO: nome,
+              CIDADE: detalhes.split('•')[0] ? detalhes.split('•')[0].trim() : '',
+              FUNCAO: detalhes.split('•')[1] ? detalhes.split('•')[1].trim() : '',
+              TELEFONE: ''
+            },
+            evento: null
+          };
+
       const qrContainer = document.getElementById('admin-qr-canvas');
       qrContainer.innerHTML = '';
 
@@ -2729,6 +3024,18 @@
       });
 
       // Botões do Comprovante QR Code
+      const btnVoucherWa = document.getElementById('btn-voucher-whatsapp');
+      if (btnVoucherWa) {
+        btnVoucherWa.addEventListener('click', () => {
+          sendVoucherToParticipantWhatsapp(AppState.portal.lastVoucher);
+        });
+      }
+      const btnAdminQrWa = document.getElementById('btn-admin-qr-whatsapp');
+      if (btnAdminQrWa) {
+        btnAdminQrWa.addEventListener('click', () => {
+          sendVoucherToParticipantWhatsapp(AppState.admin.selectedParticipantForQr);
+        });
+      }
       document.getElementById('btn-voucher-download').addEventListener('click', () => {
         const uuid = document.getElementById('voucher-uuid').textContent || 'credencial';
         downloadQrCodeFromContainer('voucher-qrcode', `Credencial_CNS_${uuid.substring(0, 8)}`);
@@ -2793,6 +3100,14 @@
 
       // Delegação de cliques na Tabela de Eventos
       document.getElementById('eventos-tbody').addEventListener('click', (e) => {
+        const btnWa = e.target.closest('.js-btn-whatsapp-evento');
+        if (btnWa) {
+          const id = btnWa.getAttribute('data-id');
+          const ev = (AppState.admin.bundle.eventos || []).find((x) => x.ID_EVENTO === id);
+          if (ev) openWhatsappEventoModal(ev);
+          return;
+        }
+
         const btnPoster = e.target.closest('.js-btn-poster-evento');
         if (btnPoster) {
           const id = btnPoster.getAttribute('data-id');
@@ -2827,6 +3142,48 @@
           );
         }
       });
+
+      // Controles do Modal de Envio para Grupo de WhatsApp (CNS - Campinas)
+      const selectWaModelo = document.getElementById('wa-evento-modelo');
+      if (selectWaModelo) {
+        selectWaModelo.addEventListener('change', (e) => {
+          const ev = AppState.admin.selectedWhatsappEvento;
+          const textarea = document.getElementById('wa-evento-mensagem');
+          if (ev && textarea) {
+            textarea.value = buildWhatsappEventoInviteText(ev, e.target.value || 'COMPLETA');
+          }
+        });
+      }
+
+      const btnCopyWaEvento = document.getElementById('btn-copy-wa-evento');
+      if (btnCopyWaEvento) {
+        btnCopyWaEvento.addEventListener('click', async () => {
+          const textarea = document.getElementById('wa-evento-mensagem');
+          if (!textarea || !textarea.value) return;
+          try {
+            await navigator.clipboard.writeText(textarea.value);
+            toastr.success('Mensagem de convocação copiada para a área de transferência!');
+          } catch (_) {
+            textarea.select();
+            document.execCommand('copy');
+            toastr.success('Mensagem copiada para a área de transferência!');
+          }
+        });
+      }
+
+      const btnSendWaEvento = document.getElementById('btn-send-wa-evento');
+      if (btnSendWaEvento) {
+        btnSendWaEvento.addEventListener('click', () => {
+          const textarea = document.getElementById('wa-evento-mensagem');
+          const msg = textarea ? textarea.value.trim() : '';
+          if (!msg) {
+            toastr.warning('A mensagem não pode estar vazia.');
+            return;
+          }
+          const waUrl = buildWhatsappApiUrl(msg, '');
+          window.open(waUrl, '_blank', 'noopener,noreferrer');
+        });
+      }
 
       // Controles do Modal de Cartaz QR Code do Evento
       document.getElementById('btn-copy-poster-link').addEventListener('click', async () => {
@@ -2960,7 +3317,13 @@
 
       populateStaticSelectOptions();
       bindDomEvents();
-      switchView(AppState.currentView);
+
+      if (boot.initialVoucher && boot.initialVoucher.inscricao) {
+        AppState.portal.lastVoucher = boot.initialVoucher;
+        renderVoucherScreen(boot.initialVoucher);
+      } else {
+        switchView(AppState.currentView);
+      }
     }
 
     if (document.readyState === 'loading') {

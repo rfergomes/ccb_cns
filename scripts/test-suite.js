@@ -383,7 +383,22 @@ function runTests() {
     ACEITE_LGPD: true
   });
   assert.strictEqual(inscricaoRes2.success, true);
-  console.log('✓ [5/9] Inscrições validadas (pelo menos E-mail ou Telefone obrigatório + LGPD).');
+
+  // Testa recuperação direta da credencial QR Code via link do WhatsApp (?credencial=UUID)
+  const voucherLookup = gasGlobalContext.apiGetVoucherById(inscricaoRes1.inscricao.ID_INSCRICAO);
+  assert.ok(voucherLookup && voucherLookup.inscricao);
+  assert.strictEqual(voucherLookup.inscricao.ID_INSCRICAO, inscricaoRes1.inscricao.ID_INSCRICAO);
+
+  const portalWithVoucher = gasGlobalContext.apiGetPortalState(
+    '',
+    inscricaoRes1.inscricao.ID_INSCRICAO
+  );
+  assert.ok(portalWithVoucher.initialVoucher && portalWithVoucher.initialVoucher.inscricao);
+  assert.strictEqual(
+    portalWithVoucher.initialVoucher.inscricao.ID_INSCRICAO,
+    inscricaoRes1.inscricao.ID_INSCRICAO
+  );
+  console.log('✓ [5/9] Inscrições e link direto de Credencial QR Code (WhatsApp) validados.');
 
   // Teste 6: Bloqueio de Check-in antes da janela de 1 hora do evento e liberação dentro da janela
   assert.throws(() => {

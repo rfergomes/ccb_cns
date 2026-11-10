@@ -116,7 +116,11 @@ function doGet(e) {
 
   const template = createHtmlTemplateSafe_('Index');
   template.initialView = currentView;
-  template.bootstrapJson = JSON.stringify(initialBootstrapData);
+  template.bootstrapJson = JSON.stringify(initialBootstrapData)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 
   let pageTitle = 'Agenda CNS | Convocação e Credenciamento - CCB Regional Campinas';
   if (currentView === 'admin') {
