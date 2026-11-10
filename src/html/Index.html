@@ -1447,33 +1447,44 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
         <div class="modal-body p-4 text-center" id="evento-poster-printable">
-          <div class="ccb-report-logos mb-3">
-            <img
-              src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
-              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
-              alt="Logotipo CCB"
-            >
-            <span class="ccb-logo-divider"></span>
-            <img
-              src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
-              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
-              alt="Logotipo CNS"
-            >
+          <div class="poster-brand-stack d-flex flex-column align-items-center gap-2 mb-3">
+            <div class="ccb-report-logos">
+              <img
+                src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
+                alt="Logotipo CCB"
+              >
+              <span class="ccb-logo-divider"></span>
+              <img
+                src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
+                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
+                alt="Logotipo CNS"
+              >
+            </div>
+            <span class="badge-ccb-ativo d-inline-block">AUTO CHECK-IN ONLINE &bull; CNS CAMPINAS</span>
           </div>
-          <span class="badge-ccb-ativo mb-2 d-inline-block">AUTO CHECK-IN ONLINE &bull; CNS CAMPINAS</span>
-          <h3 id="poster-ev-titulo" class="fs-4 mb-1" style="color: var(--ccb-primary);">—</h3>
-          <p id="poster-ev-info" class="small text-secondary mb-3">—</p>
 
-          <div id="poster-qr-canvas" class="qr-canvas-box my-2" style="min-width: 260px; min-height: 260px;"></div>
+          <div class="poster-event-meta">
+            <h3 id="poster-ev-titulo" class="fs-4 mb-2" style="color: var(--ccb-primary);">—</h3>
+            <p id="poster-ev-info" class="small text-secondary mb-3">—</p>
+          </div>
 
-          <p class="fw-bold mt-2 mb-1" style="color: var(--ccb-primary);">
-            Aponte a câmera do seu celular para confirmar sua presença online
-          </p>
-          <p class="small text-secondary mb-3">
-            Validação automática via Conta Google/Dispositivo ou informando seu E-mail e Telefone de inscrição.
-          </p>
+          <div id="poster-qr-canvas" class="qr-canvas-box poster-qr-wrapper my-2"></div>
 
-          <div class="text-start bg-light border rounded p-3 no-print">
+          <div class="poster-cta-block">
+            <p class="poster-cta-title fw-bold mt-2 mb-1" style="color: var(--ccb-primary);">
+              Aponte a câmera do seu celular para confirmar sua presença online
+            </p>
+            <p class="poster-cta-sub small text-secondary mb-3 mx-auto">
+              Validação automática via Conta Google/Dispositivo ou informando seu E-mail e Telefone de inscrição.
+            </p>
+          </div>
+
+          <div class="poster-print-footer d-none">
+            Congregação Cristã no Brasil (CCB) &mdash; Regional Campinas/SP &bull; Comissão de Negociadores de Suprimentos (CNS)
+          </div>
+
+          <div class="text-start bg-light border rounded p-3 w-100 no-print">
             <label for="poster-ev-link" class="form-label small mb-1">
               <i class="bi bi-link-45deg me-1"></i>Link Exclusivo de Auto-Credenciamento desta Reunião:
             </label>

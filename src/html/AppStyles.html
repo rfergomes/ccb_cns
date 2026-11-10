@@ -521,6 +521,17 @@
     height: auto !important;
   }
 
+  .poster-qr-wrapper {
+    min-width: 240px;
+    min-height: 240px;
+  }
+
+  .poster-qr-wrapper img,
+  .poster-qr-wrapper canvas {
+    width: 230px !important;
+    height: 230px !important;
+  }
+
   /* Painel Administrativo - Abas e KPIs */
   .ccb-nav-tabs {
     border-bottom: 2px solid var(--ccb-gray);
@@ -1134,21 +1145,117 @@
 
     body.modal-open .modal.show .modal-dialog,
     body.print-poster-mode #modal-evento-poster .modal-dialog {
-      max-width: 600px !important;
+      max-width: 100% !important;
       width: 100% !important;
-      margin: 0.5rem auto !important;
+      margin: 0 !important;
       transform: none !important;
       min-height: 0 !important;
     }
 
     body.modal-open .modal.show .modal-content,
     body.print-poster-mode #modal-evento-poster .modal-content {
-      border: 2px solid #033D60 !important;
-      border-radius: 10px !important;
+      border: 3px solid #033D60 !important;
+      border-radius: 14px !important;
       box-shadow: none !important;
       background-color: #FFFFFF !important;
       break-inside: avoid !important;
       page-break-inside: avoid !important;
+    }
+
+    body.modal-open #modal-evento-poster.show .modal-content,
+    body.print-poster-mode #modal-evento-poster .modal-content {
+      min-height: 260mm !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    #evento-poster-printable {
+      flex: 1 1 auto !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      padding: 12mm 10mm !important;
+      width: 100% !important;
+    }
+
+    #evento-poster-printable .poster-brand-stack {
+      gap: 5mm !important;
+      margin-bottom: 0 !important;
+    }
+
+    #evento-poster-printable .ccb-report-logos {
+      padding: 0.65rem 1.4rem !important;
+      gap: 1.25rem !important;
+      border: 1.5px solid #CDD4DC !important;
+    }
+
+    #evento-poster-printable .ccb-report-logos img {
+      height: 56px !important;
+      max-width: 165px !important;
+    }
+
+    #evento-poster-printable .ccb-logo-divider {
+      height: 38px !important;
+    }
+
+    #evento-poster-printable .badge-ccb-ativo {
+      font-size: 0.98rem !important;
+      padding: 0.45em 1.25em !important;
+      letter-spacing: 0.05em !important;
+    }
+
+    #evento-poster-printable #poster-ev-titulo {
+      font-size: 1.95rem !important;
+      line-height: 1.2 !important;
+      margin-bottom: 3mm !important;
+    }
+
+    #evento-poster-printable #poster-ev-info {
+      font-size: 1.1rem !important;
+      line-height: 1.45 !important;
+      color: #201E1E !important;
+      margin-bottom: 0 !important;
+    }
+
+    #evento-poster-printable .poster-qr-wrapper {
+      padding: 6mm !important;
+      border: 2.5px solid #033D60 !important;
+      border-radius: 14px !important;
+      margin: 4mm auto !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+    }
+
+    #evento-poster-printable .poster-qr-wrapper img,
+    #evento-poster-printable .poster-qr-wrapper canvas {
+      width: 102mm !important;
+      height: 102mm !important;
+      image-rendering: pixelated !important;
+    }
+
+    #evento-poster-printable .poster-cta-title {
+      font-size: 1.45rem !important;
+      line-height: 1.3 !important;
+      margin-top: 0 !important;
+      margin-bottom: 2.5mm !important;
+    }
+
+    #evento-poster-printable .poster-cta-sub {
+      font-size: 1rem !important;
+      color: #49656C !important;
+      max-width: 88% !important;
+      margin-bottom: 0 !important;
+    }
+
+    #evento-poster-printable .poster-print-footer {
+      display: block !important;
+      width: 100% !important;
+      border-top: 1.5px solid #CDD4DC !important;
+      padding-top: 4mm !important;
+      font-size: 0.88rem !important;
+      font-weight: 700 !important;
+      color: #49656C !important;
     }
   }
 </style>
