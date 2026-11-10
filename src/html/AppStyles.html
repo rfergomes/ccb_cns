@@ -1,0 +1,913 @@
+<style>
+  :root {
+    --ccb-primary: #033D60;
+    --ccb-primary-dark: #022B44;
+    --ccb-white: #FFFFFF;
+    --ccb-text: #201E1E;
+    --ccb-gray: #CDD4DC;
+    --ccb-bg-light: #F4F6F8;
+    --ccb-slate: #49656C;
+    --ccb-green: #5DB196;
+    --ccb-green-dark: #438E76;
+    --ccb-red: #DC3C00;
+    --ccb-yellow: #FFCC66;
+    --font-primary: Verdana, Geneva, Tahoma, sans-serif;
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    font-family: var(--font-primary);
+    color: var(--ccb-text);
+    background-color: var(--ccb-bg-light);
+    accent-color: var(--ccb-primary);
+    line-height: 1.55;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Tipografia equilibrada conforme diretrizes modernas de legibilidade */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .ccb-heading-balance {
+    font-family: var(--font-primary);
+    color: var(--ccb-primary);
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  p,
+  blockquote,
+  li,
+  .pretty-text {
+    text-wrap: pretty;
+  }
+
+  /* Cabeçalho Institucional CCB com Logotipos CCB e CNS */
+  .ccb-navbar {
+    background-color: var(--ccb-primary);
+    color: var(--ccb-white);
+    border-bottom: 4px solid var(--ccb-slate);
+    box-shadow: 0 2px 10px rgba(3, 61, 96, 0.15);
+  }
+
+  .ccb-brand-logos {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    background-color: var(--ccb-white);
+    padding: 0.35rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid var(--ccb-gray);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    flex-shrink: 0;
+  }
+
+  .ccb-logo-img {
+    height: 36px;
+    width: auto;
+    max-width: 100px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .ccb-logo-divider {
+    width: 1px;
+    height: 26px;
+    background-color: var(--ccb-gray);
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .ccb-report-logos {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    background-color: var(--ccb-white);
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--ccb-gray);
+    max-width: 100%;
+  }
+
+  .ccb-report-logos img {
+    height: 40px;
+    width: auto;
+    max-width: 115px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .ccb-navbar-title {
+    color: var(--ccb-white);
+    font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.25;
+  }
+
+  .ccb-navbar-subtitle {
+    color: var(--ccb-gray);
+    font-size: clamp(0.7rem, 1.8vw, 0.78rem);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  /* Cartões e Painéis Sóbrios com Container Queries para Escala Fluida */
+  .ccb-card {
+    background-color: var(--ccb-white);
+    border: 1px solid var(--ccb-gray);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(32, 30, 30, 0.05);
+    overflow: clip;
+    container-type: inline-size;
+  }
+
+  .ccb-card-header {
+    background-color: var(--ccb-primary);
+    color: var(--ccb-white);
+    padding: 0.9rem 1.15rem;
+    border-bottom: 2px solid var(--ccb-slate);
+  }
+
+  .ccb-card-header h2,
+  .ccb-card-header h3,
+  .ccb-card-header h4,
+  .ccb-card-header h5 {
+    color: var(--ccb-white);
+    margin: 0;
+    font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+  }
+
+  @supports (font-size: 1cqi) {
+    .ccb-card-header h2,
+    .ccb-card-header h3 {
+      font-size: clamp(0.95rem, 3.5cqi, 1.15rem);
+    }
+  }
+
+  .ccb-card-subheader {
+    background-color: var(--ccb-slate);
+    color: var(--ccb-white);
+    padding: 0.65rem 1.15rem;
+    font-size: 0.84rem;
+  }
+
+  /* Destaques de Convocação Oficial */
+  .ccb-info-tile {
+    background-color: #F8FAFC;
+    border: 1px solid var(--ccb-gray);
+    border-left: 4px solid var(--ccb-primary);
+    border-radius: 6px;
+    padding: 0.8rem 0.95rem;
+    height: 100%;
+  }
+
+  .ccb-info-tile.tile-lanche {
+    border-left-color: var(--ccb-yellow);
+  }
+
+  .ccb-info-tile.tile-local {
+    border-left-color: var(--ccb-green);
+  }
+
+  .ccb-info-label {
+    font-size: 0.73rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ccb-slate);
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+    display: block;
+  }
+
+  .ccb-info-value {
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: var(--ccb-text);
+    margin: 0;
+    word-break: break-word;
+  }
+
+  /* Cartão de Auto-Detecção (Conta Google / Dispositivo) */
+  .auto-match-card {
+    background-color: #F2FAF7;
+    border: 2px solid var(--ccb-green);
+    border-radius: 8px;
+    padding: 1.15rem;
+  }
+
+  /* Botões Institucionais com Alvo de Toque Acessível (mínimo 44px em mobile) */
+  .btn-ccb-primary {
+    background-color: var(--ccb-primary);
+    border-color: var(--ccb-primary);
+    color: var(--ccb-white);
+    font-weight: 700;
+    padding: 0.6rem 1.2rem;
+    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  }
+
+  .btn-ccb-primary:hover,
+  .btn-ccb-primary:focus-visible {
+    background-color: var(--ccb-primary-dark);
+    border-color: var(--ccb-primary-dark);
+    color: var(--ccb-white);
+  }
+
+  .btn-ccb-success {
+    background-color: var(--ccb-green);
+    border-color: var(--ccb-green);
+    color: var(--ccb-white);
+    font-weight: 700;
+  }
+
+  .btn-ccb-success:hover,
+  .btn-ccb-success:focus-visible {
+    background-color: var(--ccb-green-dark);
+    border-color: var(--ccb-green-dark);
+    color: var(--ccb-white);
+  }
+
+  .btn-ccb-danger {
+    background-color: var(--ccb-red);
+    border-color: var(--ccb-red);
+    color: var(--ccb-white);
+    font-weight: 700;
+  }
+
+  .btn-ccb-danger:hover,
+  .btn-ccb-danger:focus-visible {
+    background-color: #b53000;
+    border-color: #b53000;
+    color: var(--ccb-white);
+  }
+
+  .btn-ccb-slate {
+    background-color: var(--ccb-slate);
+    border-color: var(--ccb-slate);
+    color: var(--ccb-white);
+    font-weight: 700;
+  }
+
+  .btn-ccb-slate:hover,
+  .btn-ccb-slate:focus-visible {
+    background-color: #384f55;
+    border-color: #384f55;
+    color: var(--ccb-white);
+  }
+
+  .btn-ccb-outline {
+    background-color: transparent;
+    border: 1px solid var(--ccb-primary);
+    color: var(--ccb-primary);
+    font-weight: 700;
+  }
+
+  .btn-ccb-outline:hover,
+  .btn-ccb-outline:focus-visible {
+    background-color: var(--ccb-primary);
+    color: var(--ccb-white);
+  }
+
+  /* Controles de Formulário */
+  .form-label {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--ccb-text);
+    margin-bottom: 0.35rem;
+  }
+
+  .form-control,
+  .form-select {
+    font-family: var(--font-primary);
+    font-size: 0.94rem;
+    border: 1px solid var(--ccb-gray);
+    color: var(--ccb-text);
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    min-height: 44px;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    border-color: var(--ccb-primary);
+    box-shadow: 0 0 0 0.2rem rgba(3, 61, 96, 0.2);
+  }
+
+  .error-msg {
+    display: none;
+    color: var(--ccb-red);
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-top: 0.3rem;
+  }
+
+  /* Feedback de campos obrigatórios somente após interação real ou tentativa de envio */
+  input.user-invalid-fallback,
+  select.user-invalid-fallback,
+  textarea.user-invalid-fallback,
+  .field-invalid input,
+  .field-invalid select,
+  .field-invalid textarea,
+  .field-invalid .select2-selection--single {
+    border-color: var(--ccb-red) !important;
+    background-color: #FFF5F2;
+  }
+
+  .field-invalid > .error-msg,
+  .field-invalid .error-msg {
+    display: block;
+  }
+
+  input:required:user-valid,
+  select:required:user-valid,
+  input.user-valid-fallback,
+  select.user-valid-fallback {
+    border-color: var(--ccb-green);
+    border-width: 1.5px;
+  }
+
+  /* Fallback progressivo para navegadores sem suporte a accent-color */
+  @supports not (accent-color: #033D60) {
+    input[type="checkbox"].ccb-checkbox-native {
+      position: absolute !important;
+      clip-path: inset(50%) !important;
+      overflow: hidden !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      border: 0 !important;
+    }
+
+    input[type="checkbox"].ccb-checkbox-native + span {
+      position: relative;
+      padding-left: 1.8rem;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    input[type="checkbox"].ccb-checkbox-native + span::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.15rem;
+      width: 1.15rem;
+      height: 1.15rem;
+      border: 2px solid var(--ccb-primary);
+      border-radius: 3px;
+      background-color: var(--ccb-white);
+    }
+
+    input[type="checkbox"].ccb-checkbox-native:focus-visible + span::before {
+      outline: 2px solid var(--ccb-primary);
+      outline-offset: 2px;
+    }
+
+    input[type="checkbox"].ccb-checkbox-native:checked + span::before {
+      background-color: var(--ccb-primary);
+      border-color: var(--ccb-primary);
+    }
+
+    input[type="checkbox"].ccb-checkbox-native:checked + span::after {
+      content: "✓";
+      position: absolute;
+      left: 0.22rem;
+      top: 0.05rem;
+      color: var(--ccb-white);
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+  }
+
+  /* Caixa de Consentimento LGPD */
+  .lgpd-consent-box {
+    background-color: #F8FAFC;
+    border: 1px solid var(--ccb-gray);
+    border-left: 4px solid var(--ccb-primary);
+    border-radius: 6px;
+    padding: 0.95rem 1.1rem;
+  }
+
+  .lgpd-text {
+    font-size: 0.83rem;
+    color: var(--ccb-text);
+    margin-bottom: 0;
+  }
+
+  /* Estilização Customizada Select2 para Identidade CCB */
+  .select2-container {
+    width: 100% !important;
+    font-family: var(--font-primary);
+    font-size: 0.94rem;
+  }
+
+  .select2-container--default .select2-selection--single {
+    min-height: 44px;
+    height: auto;
+    border: 1px solid var(--ccb-gray);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    background-color: var(--ccb-white);
+    display: flex;
+    align-items: center;
+  }
+
+  .select2-container--default.select2-container--focus .select2-selection--single,
+  .select2-container--default.select2-container--open .select2-selection--single {
+    border-color: var(--ccb-primary);
+    box-shadow: 0 0 0 0.2rem rgba(3, 61, 96, 0.2);
+  }
+
+  .select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: var(--ccb-text);
+    line-height: 1.4;
+    padding-left: 0.25rem;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 42px;
+    right: 6px;
+  }
+
+  .select2-dropdown {
+    border: 1px solid var(--ccb-primary);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(3, 61, 96, 0.15);
+    font-family: var(--font-primary);
+    font-size: 0.92rem;
+  }
+
+  .select2-container--default .select2-search--dropdown .select2-search__field {
+    border: 1px solid var(--ccb-gray);
+    border-radius: 4px;
+    padding: 0.45rem 0.65rem;
+    font-family: var(--font-primary);
+    font-size: 16px;
+  }
+
+  .select2-container--default .select2-search--dropdown .select2-search__field:focus {
+    outline: none;
+    border-color: var(--ccb-primary);
+  }
+
+  .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
+    background-color: var(--ccb-primary);
+    color: var(--ccb-white);
+  }
+
+  /* Comprovante QR Code */
+  .qr-voucher-container {
+    background-color: var(--ccb-white);
+    border: 2px solid var(--ccb-primary);
+    border-radius: 8px;
+    padding: 1.35rem;
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    overflow: clip;
+  }
+
+  .qr-canvas-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.85rem;
+    background-color: var(--ccb-white);
+    border: 2px solid var(--ccb-gray);
+    border-radius: 8px;
+    max-width: 100%;
+  }
+
+  .qr-canvas-box img,
+  .qr-canvas-box canvas {
+    margin: 0 auto;
+    display: block;
+    max-width: 100%;
+    height: auto !important;
+  }
+
+  /* Painel Administrativo - Abas e KPIs */
+  .ccb-nav-tabs {
+    border-bottom: 2px solid var(--ccb-gray);
+    gap: 0.35rem;
+  }
+
+  .ccb-nav-tabs .nav-link {
+    font-family: var(--font-primary);
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--ccb-slate);
+    border: 1px solid transparent;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 0.65rem 1rem;
+    background-color: #E9EEF2;
+    min-height: 44px;
+  }
+
+  .ccb-nav-tabs .nav-link:hover {
+    color: var(--ccb-primary);
+    background-color: #DCE4EC;
+  }
+
+  .ccb-nav-tabs .nav-link.active {
+    background-color: var(--ccb-primary);
+    color: var(--ccb-white);
+    border-color: var(--ccb-primary);
+  }
+
+  .kpi-card {
+    background-color: var(--ccb-white);
+    border: 1px solid var(--ccb-gray);
+    border-top: 4px solid var(--ccb-primary);
+    border-radius: 8px;
+    padding: 1.05rem 1.15rem;
+    height: 100%;
+    box-shadow: 0 2px 6px rgba(32, 30, 30, 0.04);
+  }
+
+  .kpi-card.kpi-green {
+    border-top-color: var(--ccb-green);
+  }
+
+  .kpi-card.kpi-yellow {
+    border-top-color: var(--ccb-yellow);
+  }
+
+  .kpi-card.kpi-slate {
+    border-top-color: var(--ccb-slate);
+  }
+
+  .kpi-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ccb-slate);
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+  }
+
+  .kpi-value {
+    font-size: clamp(1.45rem, 3.5vw, 1.85rem);
+    font-weight: 700;
+    color: var(--ccb-primary);
+    line-height: 1.15;
+    margin-bottom: 0.2rem;
+  }
+
+  .kpi-card.kpi-green .kpi-value {
+    color: var(--ccb-green-dark);
+  }
+
+  .kpi-subtitle {
+    font-size: 0.75rem;
+    color: var(--ccb-slate);
+    margin: 0;
+  }
+
+  /* Badges de Status Institucionais */
+  .badge-ccb-ativo {
+    background-color: var(--ccb-green);
+    color: var(--ccb-white);
+    font-weight: 700;
+    padding: 0.35em 0.65em;
+    border-radius: 4px;
+    font-size: 0.76rem;
+  }
+
+  .badge-ccb-encerrado {
+    background-color: var(--ccb-slate);
+    color: var(--ccb-white);
+    font-weight: 700;
+    padding: 0.35em 0.65em;
+    border-radius: 4px;
+    font-size: 0.76rem;
+  }
+
+  .badge-ccb-pendente {
+    background-color: var(--ccb-yellow);
+    color: var(--ccb-text);
+    font-weight: 700;
+    padding: 0.35em 0.65em;
+    border-radius: 4px;
+    font-size: 0.76rem;
+  }
+
+  /* Tabelas Administrativas com estabilidade de rolagem */
+  .table-responsive {
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ccb-table {
+    font-size: 0.86rem;
+    vertical-align: middle;
+  }
+
+  .ccb-table thead th {
+    background-color: var(--ccb-primary);
+    color: var(--ccb-white);
+    font-weight: 700;
+    border-bottom: 2px solid var(--ccb-slate);
+    white-space: nowrap;
+    padding: 0.75rem;
+  }
+
+  .ccb-table tbody td {
+    padding: 0.7rem 0.75rem;
+    border-bottom: 1px solid var(--ccb-gray);
+    color: var(--ccb-text);
+  }
+
+  .ccb-table tbody tr:hover {
+    background-color: #F1F5F8;
+  }
+
+  /* Terminal Leitor de QR Code (html5-qrcode) */
+  #qr-reader-viewport {
+    width: 100%;
+    max-width: 460px;
+    margin: 0 auto;
+    border: 2px solid var(--ccb-primary);
+    border-radius: 8px;
+    overflow: clip;
+    background-color: #12181B;
+    min-height: 260px;
+  }
+
+  #qr-reader-viewport video {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block;
+  }
+
+  .checkin-result-banner {
+    border: 2px solid var(--ccb-gray);
+    border-radius: 8px;
+    padding: 1.05rem;
+    background-color: var(--ccb-white);
+  }
+
+  .checkin-result-banner.status-ok {
+    border-color: var(--ccb-green);
+    background-color: #F2FAF7;
+  }
+
+  .checkin-result-banner.status-warn {
+    border-color: var(--ccb-yellow);
+    background-color: #FFFDF5;
+  }
+
+  .checkin-result-banner.status-error {
+    border-color: var(--ccb-red);
+    background-color: #FFF5F2;
+  }
+
+  /* Spinner Overlay Global */
+  .ccb-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(3, 61, 96, 0.55);
+    z-index: 2050;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--ccb-white);
+    padding: 1rem;
+    text-align: center;
+  }
+
+  /* Garante que modais SweetAlert2 sempre fiquem acima do overlay de carregamento */
+  .swal2-container {
+    z-index: 2100 !important;
+  }
+
+  .ccb-footer {
+    margin-top: auto;
+    background-color: var(--ccb-white);
+    border-top: 1px solid var(--ccb-gray);
+    color: var(--ccb-slate);
+    font-size: 0.78rem;
+    padding: 1rem 0;
+  }
+
+  /* ==========================================================================
+   * RESPONSIVIDADE AVANÇADA PARA DISPOSITIVOS MÓVEIS (SMARTPHONES E TABLETS)
+   * ========================================================================== */
+  @media (max-width: 991.98px) {
+    .ccb-navbar .container > .d-flex {
+      flex-direction: column;
+      align-items: stretch !important;
+    }
+
+    .ccb-navbar nav {
+      width: 100%;
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.4rem !important;
+    }
+
+    .ccb-navbar nav .btn {
+      width: 100%;
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      padding: 0.4rem 0.35rem;
+      white-space: nowrap;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    /* Previne auto-zoom indesejado no iOS Safari / Android Chrome ao focar inputs */
+    .form-control,
+    .form-select,
+    .select2-container,
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+      font-size: 16px !important;
+    }
+
+    .ccb-logo-img {
+      height: 30px;
+      max-width: 82px;
+    }
+
+    .ccb-brand-logos {
+      padding: 0.28rem 0.55rem;
+      gap: 0.45rem;
+    }
+
+    /* Abas administrativas em grade 2x2 confortável para o polegar */
+    .ccb-nav-tabs {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr);
+      width: 100%;
+      gap: 0.4rem;
+      border-bottom: none;
+    }
+
+    .ccb-nav-tabs .nav-item {
+      width: 100%;
+    }
+
+    .ccb-nav-tabs .nav-link {
+      width: 100%;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 0.78rem;
+      padding: 0.55rem 0.4rem;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Transforma tabelas complexas (Eventos e Inscrições) em Cartões Mobile Empilhados */
+    .ccb-table-mobile-cards thead {
+      display: none;
+    }
+
+    .ccb-table-mobile-cards,
+    .ccb-table-mobile-cards tbody,
+    .ccb-table-mobile-cards tr,
+    .ccb-table-mobile-cards td {
+      display: block;
+      width: 100%;
+    }
+
+    .ccb-table-mobile-cards tbody tr {
+      background-color: var(--ccb-white);
+      border: 1px solid var(--ccb-gray);
+      border-left: 4px solid var(--ccb-primary);
+      border-radius: 8px;
+      margin-bottom: 0.85rem;
+      padding: 0.35rem 0.75rem;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .ccb-table-mobile-cards tbody td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      text-align: right !important;
+      padding: 0.5rem 0.25rem;
+      border-bottom: 1px dashed #E2E8F0;
+      gap: 0.75rem;
+      white-space: normal !important;
+      word-break: break-word;
+    }
+
+    .ccb-table-mobile-cards tbody td:last-child {
+      border-bottom: none;
+      padding-top: 0.65rem;
+      justify-content: flex-end;
+    }
+
+    .ccb-table-mobile-cards tbody td[data-label]::before {
+      content: attr(data-label);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--ccb-slate);
+      text-align: left;
+      flex-shrink: 0;
+    }
+
+    .ccb-table-mobile-cards tbody td .btn-group {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .ccb-table-mobile-cards tbody td .btn-group > .btn {
+      flex: 1 1 auto;
+      border-radius: 6px !important;
+      min-height: 38px;
+    }
+
+    .qr-voucher-container {
+      padding: 1rem;
+    }
+
+    .ccb-footer .container {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .ccb-navbar nav {
+      grid-template-columns: 1fr;
+    }
+
+    .ccb-nav-tabs {
+      grid-template-columns: 1fr;
+    }
+
+    /* Botões de ação em pilha de largura total em telas muito estreitas */
+    .mobile-stack-buttons {
+      flex-direction: column !important;
+      align-items: stretch !important;
+    }
+
+    .mobile-stack-buttons > .btn {
+      width: 100%;
+      min-height: 44px;
+    }
+
+    .auto-match-card > .d-flex {
+      flex-direction: column;
+      align-items: flex-start !important;
+    }
+  }
+
+  /* Regras de Impressão (Comprovante QR Code, Cartaz QR Code do Evento e Relatório PDF) */
+  @media print {
+    body {
+      background-color: #FFFFFF !important;
+      color: #000000 !important;
+    }
+
+    .no-print,
+    .ccb-navbar,
+    .ccb-nav-tabs,
+    .ccb-footer {
+      display: none !important;
+    }
+
+    .ccb-card,
+    .qr-voucher-container,
+    .kpi-card {
+      box-shadow: none !important;
+      border: 1px solid #000000 !important;
+      break-inside: avoid;
+    }
+
+    .print-only-header {
+      display: flex !important;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #033D60;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+    }
+  }
+</style>

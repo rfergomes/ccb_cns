@@ -1,0 +1,29 @@
+{
+  "name": "agenda-cns-ccb-campinas",
+  "version": "1.0.0",
+  "description": "Sistema de Gestão de Convocações, Credenciamento e Presença da CNS - CCB Regional Campinas/SP",
+  "private": true,
+  "scripts": {
+    "clean": "node -e \"const fs = require('fs'); fs.rmSync('dist', { recursive: true, force: true }); fs.mkdirSync('dist', { recursive: true });\"",
+    "build": "node scripts/build.js",
+    "test": "node scripts/test-suite.js",
+    "push": "pnpm run build && clasp push",
+    "deploy": "pnpm run build && clasp deploy",
+    "open": "clasp open"
+  },
+  "keywords": [
+    "google-apps-script",
+    "clasp",
+    "ccb",
+    "cns",
+    "lgpd",
+    "credenciamento",
+    "qrcode"
+  ],
+  "author": "Regional Campinas - CNS",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  }
+}
+

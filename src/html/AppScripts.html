@@ -1,0 +1,2564 @@
+<script>
+  /**
+   * @fileoverview Lógica de cliente (Frontend ES6+) da aplicação "Agenda CNS"
+   * Regional Campinas/SP - Congregação Cristã no Brasil (CCB).
+   */
+  (() => {
+    'use strict';
+
+    /* ========================================================================
+     * ESTADO GLOBAL DA APLICAÇÃO CLIENTE
+     * ======================================================================== */
+    const AppState = {
+      currentView: ['admin', 'checkin'].includes(window.__INITIAL_VIEW__)
+        ? window.__INITIAL_VIEW__
+        : 'portal',
+      portal: {
+        hasActiveEvent: false,
+        activeEvent: null,
+        activeEvents: [],
+        googleSessionMatch: null,
+        autoMatchCandidate: null,
+        autoMatchSource: 'NONE',
+        metadata: {
+          webAppUrl: '',
+          detectedGoogleEmail: '',
+          cidades: [
+            'Campinas',
+            'Cosmópolis',
+            'Hortolândia',
+            'Indaiatuba',
+            'Monte Mor',
+            'Nova Odessa',
+            'Paulínia',
+            'Sumaré',
+            'Valinhos',
+            'Vinhedo',
+            'Negociadores'
+          ],
+          funcoes: [
+            'Negociador de Suprimentos (CNS)',
+            'Coordenador Regional CNS',
+            'Membro da Administração',
+            'Ancião / Ministério',
+            'Diácono',
+            'Cooperador do Ofício Ministerial',
+            'Cooperador de Jovens e Menores',
+            'Encarregado de Suprimentos / Compras',
+            'Apoio Administrativo / Recepção',
+            'Convidado / Outro'
+          ]
+        },
+        lastVoucher: null
+      },
+      admin: {
+        authenticated: false,
+        secret: '',
+        filterEventoId: 'ALL',
+        bundle: null,
+        charts: {
+          cidades: null,
+          funcoes: null
+        },
+        scanner: {
+          instance: null,
+          isRunning: false,
+          isProcessingScan: false,
+          lastScannedCode: '',
+          lastScannedTime: 0,
+          sessionHistory: []
+        }
+      }
+    };
+
+    /* ========================================================================
+     * ARMAZENAMENTO SEGURO DE CREDENCIAL NO DISPOSITIVO (LOCALSTORAGE)
+     * ======================================================================== */
+    function saveDeviceCredential(idEvento, idInscricao) {
+      try {
+        if (!idEvento || !idInscricao || !window.localStorage) return;
+        localStorage.setItem(
+          `cns_cred_${String(idEvento).toLowerCase()}`,
+          String(idInscricao).toLowerCase()
+        );
+      } catch (_) {
+        // Ignora caso localStorage esteja bloqueado no navegador
+      }
+    }
+
+    function getDeviceCredential(idEvento) {
+      try {
+        if (!idEvento || !window.localStorage) return '';
+        return localStorage.getItem(`cns_cred_${String(idEvento).toLowerCase()}`) || '';
+      } catch (_) {
+        return '';
+      }
+    }
+
+    /* ========================================================================
+     * CONFIGURAÇÃO DO TOASTR E UTILITÁRIOS DE UI / ÁUDIO
+     * ======================================================================== */
+    if (window.toastr) {
+      toastr.options = {
+        closeButton: true,
+        progressBar: true,
+        positionClass: 'toast-top-right',
+        timeOut: '4000',
+        extendedTimeOut: '1500',
+        preventDuplicates: true
+      };
+    }
+
+    /**
+     * Exibe ou oculta o overlay global de carregamento.
+     * @param {boolean} show Se verdadeiro, exibe o spinner.
+     * @param {string} [message] Texto descritivo.
+     */
+    function setLoading(show, message = 'Processando solicitação...') {
+      const overlay = document.getElementById('global-loading');
+      const textEl = document.getElementById('global-loading-text');
+      if (!overlay) return;
+      if (textEl) textEl.textContent = message;
+      overlay.classList.toggle('d-none', !show);
+    }
+
+    /**
+     * Escapa caracteres HTML especiais para prevenir XSS ao montar tabelas dinâmicas.
+     * @param {*} str Valor a ser escapado.
+     * @returns {string}
+     */
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /**
+     * Formata uma data ISO (YYYY-MM-DD) para o padrão brasileiro (DD/MM/AAAA).
+     * @param {string} isoDate Data YYYY-MM-DD.
+     * @returns {string}
+     */
+    function formatDateBr(isoDate) {
+      if (!isoDate) return '—';
+      const parts = String(isoDate).trim().split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return String(isoDate);
+    }
+
+    /**
+     * Formata um timestamp ISO 8601 para exibição amigável em pt-BR.
+     * @param {string} isoTimestamp Timestamp ISO.
+     * @returns {string}
+     */
+    function formatTimestampBr(isoTimestamp) {
+      if (!isoTimestamp) return '—';
+      const parsed = new Date(isoTimestamp);
+      if (isNaN(parsed.getTime())) return String(isoTimestamp);
+      return parsed.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    /**
+     * Emite sinal sonoro sintetizado via Web Audio API para confirmações de Check-in.
+     * @param {'success'|'warning'|'error'} type Tipo de alerta sonoro.
+     */
+    function playBeepSound(type = 'success') {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'success') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.18, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.28);
+        } else if (type === 'warning') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(520, ctx.currentTime);
+          gain.gain.setValueAtTime(0.18, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.35);
+        } else {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, ctx.currentTime);
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.4);
+        }
+      } catch (_) {
+        // Ignora caso o navegador bloqueie áudio automático
+      }
+    }
+
+    /**
+     * Wrapper Promise para chamadas assíncronas ao Google Apps Script (`google.script.run`).
+     * @param {string} methodName Nome da função exposta em Code.js.
+     * @param {...*} args Argumentos da função.
+     * @returns {Promise<*>}
+     */
+    function callServerRpc(methodName, ...args) {
+      return new Promise((resolve, reject) => {
+        if (typeof google === 'undefined' || !google.script || !google.script.run) {
+          reject(
+            new Error(
+              'Ambiente google.script.run não detectado. Execute a aplicação a partir do Web App do Google Apps Script.'
+            )
+          );
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler((response) => resolve(response))
+          .withFailureHandler((err) => {
+            const msg = err && err.message ? err.message : String(err || 'Erro desconhecido no servidor.');
+            reject(new Error(msg));
+          })[methodName](...args);
+      });
+    }
+
+    /* ========================================================================
+     * ACESSIBILIDADE DE FORMULÁRIOS (Sem erros prematuros antes de interação)
+     * ======================================================================== */
+    const FormAccessibilityBridge = (() => {
+      const dirtyState = new WeakMap();
+
+      const applyValidationVisuals = (input, forceShowError = false) => {
+        if (!input || typeof input.checkValidity !== 'function') return;
+        const state = dirtyState.get(input) || { hasInteracted: false, hasBlurred: false };
+        const shouldEvaluate = forceShowError || (state.hasInteracted && state.hasBlurred);
+
+        if (!shouldEvaluate) {
+          return;
+        }
+
+        const isValid = input.checkValidity();
+        if (!isValid) {
+          input.setAttribute('aria-invalid', 'true');
+          input.classList.add('user-invalid-fallback');
+          input.classList.remove('user-valid-fallback');
+        } else {
+          input.removeAttribute('aria-invalid');
+          input.classList.remove('user-invalid-fallback');
+          input.classList.add('user-valid-fallback');
+        }
+
+        const fieldWrapper = input.closest('.col-md-5, .col-md-6, .col-md-7, .col-md-8, .col-md-4, .col-12, .lgpd-consent-box, .mb-3');
+        if (fieldWrapper) {
+          fieldWrapper.classList.toggle('field-invalid', !isValid);
+        }
+      };
+
+      const bindForm = (formEl) => {
+        if (!formEl) return;
+
+        formEl.addEventListener(
+          'blur',
+          (e) => {
+            if (e.target && e.target.matches('input, select, textarea')) {
+              const state = dirtyState.get(e.target) || { hasInteracted: false, hasBlurred: false };
+              state.hasBlurred = true;
+              dirtyState.set(e.target, state);
+              if (state.hasInteracted) {
+                applyValidationVisuals(e.target, false);
+              }
+            }
+          },
+          true
+        );
+
+        formEl.addEventListener('input', (e) => {
+          if (e.target && e.target.matches('input, select, textarea')) {
+            const state = dirtyState.get(e.target) || { hasInteracted: false, hasBlurred: false };
+            state.hasInteracted = true;
+            dirtyState.set(e.target, state);
+            if (e.target.checkValidity()) {
+              e.target.removeAttribute('aria-invalid');
+              e.target.classList.remove('user-invalid-fallback');
+              const wrap = e.target.closest('.col-md-5, .col-md-6, .col-md-7, .col-md-8, .col-md-4, .col-12, .lgpd-consent-box, .mb-3');
+              if (wrap) wrap.classList.remove('field-invalid');
+            }
+          }
+        });
+
+        formEl.addEventListener('change', (e) => {
+          if (e.target && e.target.matches('input, select, textarea')) {
+            const state = dirtyState.get(e.target) || { hasInteracted: false, hasBlurred: false };
+            if (e.target.value !== '' || e.target.type === 'checkbox') {
+              state.hasInteracted = true;
+              state.hasBlurred = true;
+              dirtyState.set(e.target, state);
+              applyValidationVisuals(e.target, false);
+            }
+          }
+        });
+      };
+
+      const validateFormAll = (formEl) => {
+        if (!formEl) return false;
+        const controls = formEl.querySelectorAll('input[required], select[required], textarea[required], input[type="email"]');
+        controls.forEach((ctrl) => {
+          dirtyState.set(ctrl, { hasInteracted: true, hasBlurred: true });
+          applyValidationVisuals(ctrl, true);
+        });
+        return formEl.checkValidity();
+      };
+
+      const resetFormValidation = (formEl) => {
+        if (!formEl) return;
+        formEl.querySelectorAll('input, select, textarea').forEach((ctrl) => {
+          dirtyState.delete(ctrl);
+          ctrl.removeAttribute('aria-invalid');
+          ctrl.classList.remove('user-invalid-fallback', 'user-valid-fallback');
+        });
+        formEl.querySelectorAll('.field-invalid').forEach((w) => w.classList.remove('field-invalid'));
+      };
+
+      return { bindForm, validateFormAll, resetFormValidation, applyValidationVisuals };
+    })();
+
+    /**
+     * Valida pares de campos onde pelo menos um (E-mail OU Telefone) deve ser preenchido.
+     * Se um deles estiver preenchido corretamente, o outro torna-se opcional.
+     *
+     * @param {string} emailInputId ID do input de e-mail.
+     * @param {string} phoneInputId ID do input de telefone.
+     * @param {number} [minPhoneDigits=10] Mínimo de dígitos exigidos caso o telefone seja preenchido.
+     * @returns {boolean} True se pelo menos um for válido e nenhum preenchido estiver inválido.
+     */
+    function validateEitherEmailOrPhone(emailInputId, phoneInputId, minPhoneDigits = 10) {
+      const emailEl = document.getElementById(emailInputId);
+      const phoneEl = document.getElementById(phoneInputId);
+      if (!emailEl || !phoneEl) return true;
+
+      const emailVal = emailEl.value.trim();
+      const phoneVal = phoneEl.value.trim();
+      const phoneDigits = phoneVal.replace(/\D/g, '');
+
+      const emailWrap = emailEl.closest('.col-md-5, .col-md-6, .col-md-7, .col-12');
+      const phoneWrap = phoneEl.closest('.col-md-5, .col-md-6, .col-md-7, .col-12');
+
+      const setFieldInvalid = (el, wrap, invalid) => {
+        if (invalid) {
+          el.setAttribute('aria-invalid', 'true');
+          el.classList.add('user-invalid-fallback');
+          if (wrap) wrap.classList.add('field-invalid');
+        } else {
+          el.removeAttribute('aria-invalid');
+          el.classList.remove('user-invalid-fallback');
+          if (wrap) wrap.classList.remove('field-invalid');
+        }
+      };
+
+      // Nenhum dos dois foi preenchido
+      if (!emailVal && !phoneDigits) {
+        setFieldInvalid(emailEl, emailWrap, true);
+        setFieldInvalid(phoneEl, phoneWrap, true);
+        return false;
+      }
+
+      let emailOk = true;
+      if (emailVal) {
+        emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailVal);
+      }
+
+      let phoneOk = true;
+      if (phoneVal) {
+        phoneOk = phoneDigits.length >= minPhoneDigits;
+      }
+
+      setFieldInvalid(emailEl, emailWrap, !emailOk);
+      setFieldInvalid(phoneEl, phoneWrap, !phoneOk);
+
+      return emailOk && phoneOk;
+    }
+
+    /**
+     * Vincula limpeza mútua de estado de erro entre os pares E-mail / Telefone.
+     */
+    function bindEitherEmailOrPhonePair(emailInputId, phoneInputId) {
+      const emailEl = document.getElementById(emailInputId);
+      const phoneEl = document.getElementById(phoneInputId);
+      if (!emailEl || !phoneEl) return;
+
+      const clearPairErrorsIfAnyFilled = () => {
+        if (emailEl.value.trim() || phoneEl.value.replace(/\D/g, '')) {
+          [emailEl, phoneEl].forEach((el) => {
+            el.removeAttribute('aria-invalid');
+            el.classList.remove('user-invalid-fallback');
+            const wrap = el.closest('.col-md-5, .col-md-6, .col-md-7, .col-12');
+            if (wrap) wrap.classList.remove('field-invalid');
+          });
+        }
+      };
+
+      emailEl.addEventListener('input', clearPairErrorsIfAnyFilled);
+      phoneEl.addEventListener('input', clearPairErrorsIfAnyFilled);
+    }
+
+    /* ========================================================================
+     * INICIALIZAÇÃO DO SELECT2 EM TODOS OS ELEMENTOS <select>
+     * ======================================================================== */
+    function initAllSelect2() {
+      if (!window.jQuery || !jQuery.fn.select2) return;
+
+      jQuery('select.js-select2').each(function () {
+        const $select = jQuery(this);
+        const modalParent = $select.closest('.modal');
+        const placeholderText = $select.attr('data-placeholder') || '';
+
+        const config = {
+          width: '100%',
+          language: {
+            noResults: () => 'Nenhum resultado encontrado',
+            searching: () => 'Buscando...'
+          }
+        };
+
+        if (placeholderText) {
+          config.placeholder = placeholderText;
+          config.allowClear = false;
+        }
+
+        if (modalParent.length > 0) {
+          config.dropdownParent = modalParent;
+        }
+
+        if ($select.hasClass('select2-hidden-accessible')) {
+          $select.select2('destroy');
+        }
+
+        $select.select2(config).on('select2:select', function () {
+          const wrap = this.closest('.col-md-6, .col-12');
+          if (wrap && this.value) {
+            wrap.classList.remove('field-invalid');
+            this.removeAttribute('aria-invalid');
+          }
+        });
+      });
+    }
+
+    /**
+     * Popula as opções de Cidade e Função nos selects públicos e administrativos.
+     */
+    function populateStaticSelectOptions() {
+      const cidades = (AppState.portal.metadata && AppState.portal.metadata.cidades) || [];
+      const funcoes = (AppState.portal.metadata && AppState.portal.metadata.funcoes) || [];
+
+      const pubCidade = document.getElementById('pub-cidade');
+      if (pubCidade) {
+        pubCidade.innerHTML =
+          '<option value="">Selecione a cidade...</option>' +
+          cidades.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      }
+
+      const pubFuncao = document.getElementById('pub-funcao');
+      if (pubFuncao) {
+        pubFuncao.innerHTML =
+          '<option value="">Selecione sua função...</option>' +
+          funcoes.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+      }
+
+      const manCidade = document.getElementById('man-cidade');
+      if (manCidade) {
+        manCidade.innerHTML = cidades
+          .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      }
+
+      const manFuncao = document.getElementById('man-funcao');
+      if (manFuncao) {
+        manFuncao.innerHTML = funcoes
+          .map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+      }
+
+      const insFilterCidade = document.getElementById('ins-filter-cidade');
+      if (insFilterCidade) {
+        insFilterCidade.innerHTML =
+          '<option value="ALL">Todas as Cidades</option>' +
+          cidades.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      }
+
+      // Se houver e-mail de Conta Google detectado na sessão, pré-preenche nos campos de e-mail
+      const detectedEmail = AppState.portal.metadata && AppState.portal.metadata.detectedGoogleEmail;
+      if (detectedEmail) {
+        const pubEmail = document.getElementById('pub-email');
+        if (pubEmail && !pubEmail.value) pubEmail.value = detectedEmail;
+        const scEmail = document.getElementById('sc-email');
+        if (scEmail && !scEmail.value) scEmail.value = detectedEmail;
+      }
+
+      initAllSelect2();
+    }
+
+    /* ========================================================================
+     * ROTEAMENTO DE VIEWS (PORTAL vs. CHECKIN ONLINE vs. ADMIN)
+     * ======================================================================== */
+    function switchView(targetView, options = {}) {
+      let normalized = 'portal';
+      if (targetView === 'admin') normalized = 'admin';
+      else if (targetView === 'checkin') normalized = 'checkin';
+
+      AppState.currentView = normalized;
+
+      const viewPortal = document.getElementById('view-portal');
+      const viewCheckin = document.getElementById('view-checkin');
+      const viewAdmin = document.getElementById('view-admin');
+
+      const btnPortal = document.getElementById('btn-nav-portal');
+      const btnCheckin = document.getElementById('btn-nav-checkin');
+      const btnAdmin = document.getElementById('btn-nav-admin');
+
+      viewPortal.classList.add('d-none');
+      viewCheckin.classList.add('d-none');
+      viewAdmin.classList.add('d-none');
+
+      btnPortal.className = 'btn btn-sm btn-outline-light fw-bold';
+      btnCheckin.className = 'btn btn-sm btn-outline-light fw-bold';
+      btnAdmin.className = 'btn btn-sm btn-outline-light fw-bold';
+
+      if (normalized === 'admin') {
+        viewAdmin.classList.remove('d-none');
+        btnAdmin.className = 'btn btn-sm btn-light fw-bold';
+      } else if (normalized === 'checkin') {
+        stopQrScanner();
+        viewCheckin.classList.remove('d-none');
+        btnCheckin.className = 'btn btn-sm btn-light fw-bold';
+        renderSelfCheckinView();
+      } else {
+        stopQrScanner();
+        viewPortal.classList.remove('d-none');
+        btnPortal.className = 'btn btn-sm btn-light fw-bold';
+
+        const autoCheckinInput = document.getElementById('pub-auto-checkin-now');
+        const instantAlert = document.getElementById('portal-instant-checkin-alert');
+        const submitBtn = document.getElementById('btn-submit-inscricao');
+
+        if (options.instantCheckInMode) {
+          autoCheckinInput.value = 'true';
+          instantAlert.classList.remove('d-none');
+          submitBtn.innerHTML =
+            '<i class="bi bi-check2-all me-2"></i>Concluir Inscrição e Confirmar Minha Presença Agora';
+        } else {
+          autoCheckinInput.value = 'false';
+          instantAlert.classList.add('d-none');
+          submitBtn.innerHTML =
+            '<i class="bi bi-check2-circle me-2"></i>Confirmar Inscrição e Gerar Credencial QR Code';
+        }
+
+        renderPortalView();
+      }
+    }
+
+    /* ========================================================================
+     * ROTA 1: PORTAL PÚBLICO DE CONVOCAÇÃO E INSCRIÇÃO
+     * ======================================================================== */
+    function renderPortalView() {
+      const emptyContainer = document.getElementById('portal-empty-container');
+      const activeContainer = document.getElementById('portal-active-container');
+      const voucherContainer = document.getElementById('portal-voucher-container');
+
+      if (AppState.portal.lastVoucher) {
+        emptyContainer.classList.add('d-none');
+        activeContainer.classList.add('d-none');
+        voucherContainer.classList.remove('d-none');
+        return;
+      }
+
+      voucherContainer.classList.add('d-none');
+
+      if (!AppState.portal.hasActiveEvent || !AppState.portal.activeEvent) {
+        activeContainer.classList.add('d-none');
+        emptyContainer.classList.remove('d-none');
+        return;
+      }
+
+      emptyContainer.classList.add('d-none');
+      activeContainer.classList.remove('d-none');
+
+      const activeEvents = AppState.portal.activeEvents || [];
+      const multiWrap = document.getElementById('portal-multi-event-selector-wrap');
+      const selectEv = document.getElementById('portal-select-evento');
+
+      if (activeEvents.length > 1 && selectEv) {
+        multiWrap.classList.remove('d-none');
+        const currentSelectedId = AppState.portal.activeEvent.ID_EVENTO;
+        selectEv.innerHTML = activeEvents
+          .map(
+            (ev) =>
+              `<option value="${escapeHtml(ev.ID_EVENTO)}" ${
+                ev.ID_EVENTO === currentSelectedId ? 'selected' : ''
+              }>${escapeHtml(ev.TITULO)} (${formatDateBr(ev.DATA_EVENTO)})</option>`
+          )
+          .join('');
+        initAllSelect2();
+      } else if (multiWrap) {
+        multiWrap.classList.add('d-none');
+      }
+
+      populateActiveEventCard(AppState.portal.activeEvent);
+    }
+
+    /**
+     * Avalia no cliente se a janela de check-in (1 hora antes do início do evento)
+     * já está liberada, mantendo sincronia com a regra do backend.
+     * @param {Object} ev Objeto de evento.
+     * @returns {{isOpen: boolean, releaseDateBr: string, releaseTime: string, lockMessage: string}}
+     */
+    function evaluateEventCheckInWindowClient(ev) {
+      if (!ev || !ev.DATA_EVENTO) {
+        return {
+          isOpen: false,
+          releaseDateBr: '—',
+          releaseTime: '—',
+          lockMessage: 'Nenhuma reunião selecionada.'
+        };
+      }
+
+      const mDate = String(ev.DATA_EVENTO).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const mTime = String(ev.HORA_EVENTO || '00:00').trim().match(/^(\d{2}):(\d{2})$/);
+      if (!mDate) {
+        return ev.CHECKIN_WINDOW || {
+          isOpen: false,
+          releaseDateBr: '—',
+          releaseTime: '—',
+          lockMessage: 'Data da reunião inválida.'
+        };
+      }
+
+      const evY = Number(mDate[1]);
+      const evM = Number(mDate[2]);
+      const evD = Number(mDate[3]);
+      const evH = mTime ? Number(mTime[1]) : 0;
+      const evMin = mTime ? Number(mTime[2]) : 0;
+
+      const eventWallMs = Date.UTC(evY, evM - 1, evD, evH, evMin, 0);
+      const releaseWallMs = eventWallMs - 60 * 60 * 1000;
+
+      const now = new Date();
+      const nowWallMs = Date.UTC(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        now.getHours(),
+        now.getMinutes(),
+        0
+      );
+
+      const relObj = new Date(releaseWallMs);
+      const relD = String(relObj.getUTCDate()).padStart(2, '0');
+      const relM = String(relObj.getUTCMonth() + 1).padStart(2, '0');
+      const relY = String(relObj.getUTCFullYear());
+      const relH = String(relObj.getUTCHours()).padStart(2, '0');
+      const relMin = String(relObj.getUTCMinutes()).padStart(2, '0');
+
+      const releaseDateBr = `${relD}/${relM}/${relY}`;
+      const releaseTime = `${relH}:${relMin}`;
+      const isOpen = nowWallMs >= releaseWallMs;
+
+      return {
+        isOpen,
+        releaseDateBr,
+        releaseTime,
+        lockMessage: isOpen
+          ? 'Credenciamento liberado.'
+          : `O credenciamento de presença (check-in) está bloqueado e será liberado somente 1 hora antes da reunião (${releaseDateBr} a partir das ${releaseTime}h).`
+      };
+    }
+
+    /**
+     * Preenche os dados da convocação oficial na tela pública.
+     * @param {Object} ev Objeto de evento ativo.
+     */
+    function populateActiveEventCard(ev) {
+      if (!ev) return;
+      document.getElementById('pub-id-evento').value = ev.ID_EVENTO;
+      document.getElementById('portal-ev-titulo').textContent = ev.TITULO || '—';
+      document.getElementById('portal-ev-data').textContent = formatDateBr(ev.DATA_EVENTO);
+      document.getElementById('portal-ev-hora').textContent = ev.HORA_EVENTO ? `${ev.HORA_EVENTO}h` : '—';
+      document.getElementById('portal-ev-lanche').textContent = ev.HORA_LANCHE ? `${ev.HORA_LANCHE}h` : '—';
+      document.getElementById('portal-ev-local').textContent = ev.LOCAL || '—';
+
+      const noteEl = document.getElementById('portal-checkin-window-note');
+      if (noteEl) {
+        const win = evaluateEventCheckInWindowClient(ev);
+        if (win.isOpen) {
+          noteEl.innerHTML =
+            '<span class="text-success fw-bold"><i class="bi bi-check2-circle me-1"></i>Check-in de presença liberado para esta reunião!</span>';
+        } else {
+          noteEl.innerHTML = `<i class="bi bi-clock-history me-1"></i>Liberação do Check-in de Presença: <strong>${escapeHtml(
+            win.releaseDateBr
+          )} às ${escapeHtml(win.releaseTime)}h</strong> (1h antes da reunião).`;
+        }
+      }
+    }
+
+    /**
+     * Atualiza o estado do portal consultando o backend.
+     */
+    async function refreshPortalState() {
+      try {
+        setLoading(true, 'Consultando convocações ativas...');
+        const state = await callServerRpc('apiGetPortalState', '');
+        AppState.portal.hasActiveEvent = state.hasActiveEvent;
+        AppState.portal.activeEvent = state.activeEvent;
+        AppState.portal.activeEvents = state.activeEvents || [];
+        AppState.portal.googleSessionMatch = state.googleSessionMatch || null;
+        if (state.metadata) {
+          AppState.portal.metadata = state.metadata;
+          populateStaticSelectOptions();
+        }
+        AppState.portal.lastVoucher = null;
+        renderPortalView();
+        toastr.info('Informações de convocação atualizadas.');
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Submete o formulário público de inscrição após validação e confirmação via SweetAlert2.
+     * @param {Event} event Evento de submit.
+     */
+    async function handlePublicInscriptionSubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+
+      const formValid = FormAccessibilityBridge.validateFormAll(form);
+      const contactValid = validateEitherEmailOrPhone('pub-email', 'pub-telefone', 10);
+
+      if (!formValid || !contactValid) {
+        toastr.warning('Preencha os campos obrigatórios e informe pelo menos um contato (E-mail ou Telefone).');
+        return;
+      }
+
+      const payload = {
+        ID_EVENTO: document.getElementById('pub-id-evento').value.trim(),
+        NOME_COMPLETO: document.getElementById('pub-nome').value.trim(),
+        CIDADE: jQuery('#pub-cidade').val() || '',
+        FUNCAO: jQuery('#pub-funcao').val() || '',
+        EMAIL: document.getElementById('pub-email').value.trim(),
+        TELEFONE: document.getElementById('pub-telefone').value.trim(),
+        ACEITE_LGPD: document.getElementById('pub-lgpd').checked,
+        AUTO_CHECKIN_NOW: document.getElementById('pub-auto-checkin-now').value === 'true'
+      };
+
+      const confirmResult = await Swal.fire({
+        title: payload.AUTO_CHECKIN_NOW
+          ? 'Confirmar Inscrição e Presença?'
+          : 'Confirmar Dados de Inscrição?',
+        html: `
+          <div class="text-start small">
+            <p class="mb-2">Confira seus dados antes de gerar sua credencial:</p>
+            <ul class="mb-0">
+              <li><strong>Nome:</strong> ${escapeHtml(payload.NOME_COMPLETO)}</li>
+              <li><strong>Cidade:</strong> ${escapeHtml(payload.CIDADE)}</li>
+              <li><strong>Função:</strong> ${escapeHtml(payload.FUNCAO)}</li>
+              <li><strong>E-mail:</strong> ${escapeHtml(payload.EMAIL || 'Não informado')}</li>
+              <li><strong>Telefone:</strong> ${escapeHtml(payload.TELEFONE || 'Não informado')}</li>
+            </ul>
+          </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#033D60',
+        cancelButtonColor: '#49656C',
+        confirmButtonText: 'Sim, Confirmar',
+        cancelButtonText: 'Revisar Dados'
+      });
+
+      if (!confirmResult.isConfirmed) return;
+
+      try {
+        setLoading(true, 'Registrando inscrição e gerando credencial QR Code...');
+        const response = await callServerRpc('apiSubmitPublicInscription', payload);
+        setLoading(false);
+
+        if (response.inscricao && response.evento) {
+          saveDeviceCredential(response.evento.ID_EVENTO, response.inscricao.ID_INSCRICAO);
+        }
+
+        AppState.portal.lastVoucher = response;
+        renderVoucherScreen(response);
+
+        playBeepSound('success');
+        toastr.success(response.message);
+        Swal.fire({
+          title: 'Credencial Emitida!',
+          text: response.message,
+          icon: 'success',
+          confirmButtonColor: '#033D60'
+        });
+      } catch (err) {
+        setLoading(false);
+        toastr.error(err.message);
+        Swal.fire({
+          title: 'Não foi possível concluir',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#DC3C00'
+        });
+      }
+    }
+
+    /**
+     * Renderiza o comprovante e gera o QR Code do participante com qrcodejs.
+     * @param {Object} voucherData Dados retornados pelo backend.
+     */
+    function renderVoucherScreen(voucherData) {
+      if (!voucherData || !voucherData.inscricao) return;
+      const { inscricao, evento } = voucherData;
+
+      document.getElementById('voucher-uuid').textContent = inscricao.ID_INSCRICAO;
+      document.getElementById('voucher-nome').textContent = inscricao.NOME_COMPLETO;
+      document.getElementById('voucher-cidade').textContent = inscricao.CIDADE;
+      document.getElementById('voucher-funcao').textContent = inscricao.FUNCAO;
+      document.getElementById('voucher-email').textContent = inscricao.EMAIL || '—';
+      document.getElementById('voucher-telefone').textContent = inscricao.TELEFONE || '—';
+      document.getElementById('voucher-evento-titulo').textContent = evento ? evento.TITULO : '—';
+      document.getElementById('voucher-evento-data').textContent = evento ? formatDateBr(evento.DATA_EVENTO) : '—';
+      document.getElementById('voucher-evento-hora').textContent = evento && evento.HORA_EVENTO ? `${evento.HORA_EVENTO}h` : '—';
+      document.getElementById('voucher-evento-lanche').textContent = evento && evento.HORA_LANCHE ? `${evento.HORA_LANCHE}h` : '—';
+      document.getElementById('voucher-evento-local').textContent = evento ? evento.LOCAL : '—';
+      document.getElementById('voucher-lgpd-timestamp').textContent = formatTimestampBr(inscricao.DATA_HORA_ACEITE);
+
+      const statusBadge = document.getElementById('voucher-status-badge');
+      const presencaInfo = document.getElementById('voucher-presenca-info');
+
+      if (inscricao.PRESENCA_CONFIRMADA) {
+        statusBadge.textContent = 'PRESENÇA CONFIRMADA NO EVENTO';
+        statusBadge.className = 'badge-ccb-ativo mb-2 d-inline-block';
+        presencaInfo.textContent = `✓ Check-in de presença confirmado em: ${formatTimestampBr(
+          inscricao.DATA_HORA_PRESENCA
+        )}`;
+        presencaInfo.classList.remove('d-none');
+      } else {
+        statusBadge.textContent = 'INSCRIÇÃO CONFIRMADA • AGUARDANDO CHECK-IN';
+        statusBadge.className = 'badge-ccb-ativo mb-2 d-inline-block';
+        presencaInfo.classList.add('d-none');
+      }
+
+      const qrBox = document.getElementById('voucher-qrcode');
+      qrBox.innerHTML = '';
+
+      if (window.QRCode) {
+        new QRCode(qrBox, {
+          text: inscricao.ID_INSCRICAO,
+          width: 200,
+          height: 200,
+          colorDark: '#033D60',
+          colorLight: '#FFFFFF',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }
+
+      switchView('portal');
+    }
+
+    /**
+     * Faz o download da imagem PNG do QR Code gerado em qualquer container.
+     * @param {string} containerId ID do elemento contendo o QR Code.
+     * @param {string} filenamePrefix Prefixo do arquivo PNG.
+     */
+    function downloadQrCodeFromContainer(containerId, filenamePrefix = 'QRCode_CNS') {
+      const qrBox = document.getElementById(containerId);
+      if (!qrBox) return;
+
+      const img = qrBox.querySelector('img');
+      const canvas = qrBox.querySelector('canvas');
+      let dataUrl = '';
+
+      if (canvas) {
+        dataUrl = canvas.toDataURL('image/png');
+      } else if (img && img.src) {
+        dataUrl = img.src;
+      }
+
+      if (!dataUrl) {
+        toastr.warning('Aguarde a renderização do QR Code antes de baixar.');
+        return;
+      }
+
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${filenamePrefix}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toastr.success('Download do QR Code iniciado.');
+    }
+
+    /* ========================================================================
+     * ROTA 2: AUTO-CREDENCIAMENTO ONLINE DO PARTICIPANTE (SELF CHECK-IN)
+     * ======================================================================== */
+    async function renderSelfCheckinView() {
+      const emptyCard = document.getElementById('selfcheckin-empty-card');
+      const activeCard = document.getElementById('selfcheckin-active-card');
+
+      if (!AppState.portal.hasActiveEvent || !AppState.portal.activeEvent) {
+        activeCard.classList.add('d-none');
+        emptyCard.classList.remove('d-none');
+        return;
+      }
+
+      emptyCard.classList.add('d-none');
+      activeCard.classList.remove('d-none');
+
+      const ev = AppState.portal.activeEvent;
+      document.getElementById('sc-ev-titulo').textContent = ev.TITULO || '—';
+      document.getElementById('sc-ev-data').textContent = formatDateBr(ev.DATA_EVENTO);
+      document.getElementById('sc-ev-hora').textContent = ev.HORA_EVENTO ? `${ev.HORA_EVENTO}h` : '—';
+      document.getElementById('sc-ev-local').textContent = ev.LOCAL || '—';
+
+      const lockedBox = document.getElementById('sc-locked-window-box');
+      const autoBox = document.getElementById('sc-auto-detected-box');
+      const manualBox = document.getElementById('sc-manual-form-box');
+      const footerNotReg = document.getElementById('sc-not-registered-footer');
+      const headerBadge = document.getElementById('sc-header-status-badge');
+
+      const win = evaluateEventCheckInWindowClient(ev);
+      if (!win.isOpen) {
+        if (headerBadge) {
+          headerBadge.className = 'badge-ccb-pendente';
+          headerBadge.textContent = 'CHECK-IN BLOQUEADO';
+        }
+        const msgEl = document.getElementById('sc-locked-window-msg');
+        const dtEl = document.getElementById('sc-locked-release-datetime');
+        if (msgEl) {
+          msgEl.textContent = win.lockMessage;
+        }
+        if (dtEl) {
+          dtEl.textContent = `${win.releaseDateBr} às ${win.releaseTime}h`;
+        }
+        if (lockedBox) lockedBox.classList.remove('d-none');
+        if (autoBox) autoBox.classList.add('d-none');
+        if (manualBox) manualBox.classList.add('d-none');
+        if (footerNotReg) footerNotReg.classList.add('d-none');
+        return;
+      }
+
+      if (headerBadge) {
+        headerBadge.className = 'badge-ccb-ativo';
+        headerBadge.textContent = 'CHECK-IN LIBERADO';
+      }
+      if (lockedBox) lockedBox.classList.add('d-none');
+      if (footerNotReg) footerNotReg.classList.remove('d-none');
+
+      // Verifica automaticamente Conta Google logada ou Credencial salva no aparelho
+      const savedUuid = getDeviceCredential(ev.ID_EVENTO);
+
+      if (AppState.portal.googleSessionMatch) {
+        showAutoDetectedParticipant(AppState.portal.googleSessionMatch, 'GOOGLE_ACCOUNT');
+        return;
+      }
+
+      try {
+        const matchRes = await callServerRpc(
+          'apiCheckParticipantAutoMatch',
+          ev.ID_EVENTO,
+          savedUuid
+        );
+        if (matchRes && matchRes.found && matchRes.candidate) {
+          showAutoDetectedParticipant(matchRes.candidate, matchRes.source);
+        } else {
+          document.getElementById('sc-auto-detected-box').classList.add('d-none');
+          document.getElementById('sc-manual-form-box').classList.remove('d-none');
+        }
+      } catch (_) {
+        document.getElementById('sc-auto-detected-box').classList.add('d-none');
+        document.getElementById('sc-manual-form-box').classList.remove('d-none');
+      }
+    }
+
+    /**
+     * Exibe o cartão de confirmação em 1 clique quando a Conta Google ou o Dispositivo é reconhecido.
+     * @param {Object} candidate Dados resumidos do participante.
+     * @param {string} source 'GOOGLE_ACCOUNT' | 'DEVICE_CREDENTIAL'
+     */
+    function showAutoDetectedParticipant(candidate, source) {
+      AppState.portal.autoMatchCandidate = candidate;
+      AppState.portal.autoMatchSource = source;
+
+      const box = document.getElementById('sc-auto-detected-box');
+      const badge = document.getElementById('sc-auto-source-badge');
+      const nomeEl = document.getElementById('sc-auto-nome');
+      const detEl = document.getElementById('sc-auto-detalhes');
+      const alreadyMsg = document.getElementById('sc-auto-already-msg');
+      const btnConfirm = document.getElementById('btn-sc-oneclick-confirm');
+
+      badge.textContent =
+        source === 'GOOGLE_ACCOUNT'
+          ? `Conta Google Reconhecida (${candidate.EMAIL_MASKED || 'Logado'})`
+          : 'Credencial deste Aparelho Reconhecida';
+
+      nomeEl.textContent = candidate.NOME_COMPLETO;
+      detEl.textContent = `${candidate.CIDADE} • ${candidate.FUNCAO}`;
+
+      if (candidate.PRESENCA_CONFIRMADA) {
+        alreadyMsg.classList.remove('d-none');
+        btnConfirm.innerHTML = '<i class="bi bi-qr-code me-1"></i>Visualizar Meu Comprovante de Presença';
+      } else {
+        alreadyMsg.classList.add('d-none');
+        btnConfirm.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Confirmar Minha Presença Agora (1 Clique)';
+      }
+
+      box.classList.remove('d-none');
+    }
+
+    /**
+     * Executa o Auto Check-in com 1 clique (via Conta Google ou Credencial salva no aparelho).
+     */
+    async function handleOneClickSelfCheckin() {
+      const ev = AppState.portal.activeEvent;
+      const cand = AppState.portal.autoMatchCandidate;
+      if (!ev || !cand) return;
+
+      try {
+        setLoading(true, 'Confirmando sua presença na reunião...');
+        const response = await callServerRpc('apiSubmitOnlineSelfCheckIn', {
+          ID_EVENTO: ev.ID_EVENTO,
+          METHOD: AppState.portal.autoMatchSource,
+          ID_INSCRICAO: cand.ID_INSCRICAO
+        });
+        setLoading(false);
+
+        saveDeviceCredential(ev.ID_EVENTO, response.inscricao.ID_INSCRICAO);
+        AppState.portal.lastVoucher = response;
+        renderVoucherScreen(response);
+
+        playBeepSound('success');
+        toastr.success(response.message);
+
+        Swal.fire({
+          title: response.alreadyCheckedIn ? 'Presença Já Registrada!' : 'Presença Confirmada!',
+          text: response.message,
+          icon: 'success',
+          confirmButtonColor: '#033D60'
+        });
+      } catch (err) {
+        setLoading(false);
+        playBeepSound('error');
+        toastr.error(err.message);
+      }
+    }
+
+    /**
+     * Executa o Auto Check-in validando E-mail OU Telefone informados pelo participante.
+     * @param {Event} event Submit event.
+     */
+    async function handleManualSelfCheckinSubmit(event) {
+      event.preventDefault();
+      if (!validateEitherEmailOrPhone('sc-email', 'sc-telefone', 4)) {
+        toastr.warning('Informe pelo menos o E-mail da inscrição ou o Telefone (completo ou 4 últimos dígitos).');
+        return;
+      }
+
+      const ev = AppState.portal.activeEvent;
+      if (!ev) return;
+
+      const email = document.getElementById('sc-email').value.trim();
+      const telefone = document.getElementById('sc-telefone').value.trim();
+
+      try {
+        setLoading(true, 'Validando dados de inscrição e confirmando presença...');
+        const response = await callServerRpc('apiSubmitOnlineSelfCheckIn', {
+          ID_EVENTO: ev.ID_EVENTO,
+          METHOD: 'EMAIL_PHONE',
+          EMAIL: email,
+          TELEFONE: telefone
+        });
+        setLoading(false);
+
+        saveDeviceCredential(ev.ID_EVENTO, response.inscricao.ID_INSCRICAO);
+        AppState.portal.lastVoucher = response;
+        renderVoucherScreen(response);
+
+        playBeepSound('success');
+        toastr.success(response.message);
+
+        Swal.fire({
+          title: response.alreadyCheckedIn ? 'Presença Já Confirmada!' : 'Presença Confirmada com Sucesso!',
+          html: `
+            <div class="fw-bold fs-5 mb-1" style="color: #033D60;">${escapeHtml(
+              response.inscricao.NOME_COMPLETO
+            )}</div>
+            <div class="small text-secondary">${escapeHtml(
+              response.inscricao.CIDADE
+            )} &bull; ${escapeHtml(response.inscricao.FUNCAO)}</div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#033D60'
+        });
+      } catch (err) {
+        setLoading(false);
+        playBeepSound('error');
+        toastr.error(err.message);
+        Swal.fire({
+          title: 'Não foi possível validar',
+          text: err.message,
+          icon: 'warning',
+          confirmButtonColor: '#033D60'
+        });
+      }
+    }
+
+    /* ========================================================================
+     * PAINEL ADMINISTRATIVO: AUTENTICAÇÃO E SINCRONIZAÇÃO DE DADOS
+     * ======================================================================== */
+    async function handleAdminLoginSubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!FormAccessibilityBridge.validateFormAll(form)) {
+        return;
+      }
+
+      const secretInput = document.getElementById('admin-secret-input');
+      const candidateSecret = secretInput.value.trim();
+
+      try {
+        setLoading(true, 'Verificando credenciais administrativas...');
+        const bundle = await callServerRpc('apiAdminAuthenticateAndLoad', candidateSecret, 'ALL');
+
+        AppState.admin.authenticated = true;
+        AppState.admin.secret = candidateSecret;
+        AppState.admin.filterEventoId = 'ALL';
+
+        document.getElementById('admin-auth-gate').classList.add('d-none');
+        document.getElementById('admin-workspace').classList.remove('d-none');
+
+        applyAdminBundle(bundle);
+        toastr.success('Acesso administrativo liberado com sucesso.');
+      } catch (err) {
+        setLoading(false);
+        toastr.error(err.message);
+        Swal.fire({
+          title: 'Falha de Autenticação',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#DC3C00'
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Recarrega os dados do painel administrativo para o filtro atual.
+     * @param {string} [filterId] UUID do evento ou 'ALL'.
+     */
+    async function reloadAdminDashboardData(filterId) {
+      if (!AppState.admin.authenticated || !AppState.admin.secret) return;
+      const targetFilter = filterId || AppState.admin.filterEventoId || 'ALL';
+
+      try {
+        setLoading(true, 'Sincronizando indicadores e registros...');
+        const bundle = await callServerRpc(
+          'apiAdminGetDashboardData',
+          AppState.admin.secret,
+          targetFilter
+        );
+        AppState.admin.filterEventoId = bundle.filterEventoId || 'ALL';
+        applyAdminBundle(bundle);
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Aplica o pacote completo retornado pelo AdminService em todas as 4 abas.
+     * @param {Object} bundle Pacote de dados administrativos.
+     */
+    function applyAdminBundle(bundle) {
+      if (!bundle) return;
+      AppState.admin.bundle = bundle;
+      AppState.admin.filterEventoId = bundle.filterEventoId || 'ALL';
+      if (bundle.metadata) {
+        AppState.portal.metadata = bundle.metadata;
+      }
+
+      populateAdminEventSelects(bundle.eventos || [], AppState.admin.filterEventoId);
+      renderDashboardKpisAndTables(bundle);
+      renderDashboardCharts(bundle);
+      renderEventosTable(bundle.eventos || []);
+      renderInscricoesTable();
+    }
+
+    /**
+     * Atualiza todos os seletores de reunião do painel administrativo.
+     * @param {Array<Object>} eventos Lista de eventos.
+     * @param {string} activeFilter Filtro ativo no dashboard.
+     */
+    function populateAdminEventSelects(eventos, activeFilter) {
+      const dashFilter = document.getElementById('admin-dashboard-filter');
+      if (dashFilter) {
+        dashFilter.innerHTML =
+          '<option value="ALL">Consolidado Histórico (Todas as Reuniões)</option>' +
+          eventos
+            .map(
+              (ev) =>
+                `<option value="${escapeHtml(ev.ID_EVENTO)}" ${
+                  ev.ID_EVENTO.toLowerCase() === String(activeFilter).toLowerCase() ? 'selected' : ''
+                }>${escapeHtml(ev.TITULO)} (${formatDateBr(ev.DATA_EVENTO)} - ${escapeHtml(ev.STATUS)})</option>`
+            )
+            .join('');
+      }
+
+      const insFilterEv = document.getElementById('ins-filter-evento');
+      if (insFilterEv) {
+        const currentInsEv = jQuery(insFilterEv).val() || 'ALL';
+        insFilterEv.innerHTML =
+          '<option value="ALL">Todas as Reuniões</option>' +
+          eventos
+            .map(
+              (ev) =>
+                `<option value="${escapeHtml(ev.ID_EVENTO)}" ${
+                  ev.ID_EVENTO === currentInsEv ? 'selected' : ''
+                }>${escapeHtml(ev.TITULO)} (${formatDateBr(ev.DATA_EVENTO)})</option>`
+            )
+            .join('');
+      }
+
+      const checkinEv = document.getElementById('checkin-select-evento');
+      if (checkinEv) {
+        const currentCheckinEv = jQuery(checkinEv).val() || 'ALL';
+        checkinEv.innerHTML =
+          '<option value="ALL">Qualquer Reunião Cadastrada (Reconhecimento Automático)</option>' +
+          eventos
+            .map(
+              (ev) =>
+                `<option value="${escapeHtml(ev.ID_EVENTO)}" ${
+                  ev.ID_EVENTO === currentCheckinEv ? 'selected' : ''
+                }>${escapeHtml(ev.TITULO)} (${formatDateBr(ev.DATA_EVENTO)})</option>`
+            )
+            .join('');
+      }
+
+      const manEv = document.getElementById('man-evento');
+      if (manEv) {
+        manEv.innerHTML =
+          eventos.length === 0
+            ? '<option value="">Cadastre uma reunião primeiro</option>'
+            : eventos
+                .map(
+                  (ev) =>
+                    `<option value="${escapeHtml(ev.ID_EVENTO)}">${escapeHtml(ev.TITULO)} (${formatDateBr(
+                      ev.DATA_EVENTO
+                    )})</option>`
+                )
+                .join('');
+      }
+
+      initAllSelect2();
+    }
+
+    /* ========================================================================
+     * ABA 1: DASHBOARDS, GRÁFICOS (CHART.JS) E EXPORTAÇÃO (XLSX / PDF)
+     * ======================================================================== */
+    function renderDashboardKpisAndTables(bundle) {
+      const kpis = bundle.kpis || {
+        totalInscricoes: 0,
+        totalPresencas: 0,
+        taxaPresenca: 0,
+        totalReunioes: 0
+      };
+
+      document.getElementById('kpi-total-inscricoes').textContent = kpis.totalInscricoes;
+      document.getElementById('kpi-total-presencas').textContent = kpis.totalPresencas;
+      document.getElementById('kpi-taxa-presenca').textContent = `${kpis.taxaPresenca}%`;
+      document.getElementById('kpi-total-reunioes').textContent = kpis.totalReunioes;
+
+      const printTs = document.getElementById('print-report-timestamp');
+      if (printTs) {
+        printTs.textContent = formatTimestampBr(bundle.generatedAt);
+      }
+
+      const cidadesChart = (bundle.charts && bundle.charts.cidades) || {
+        labels: [],
+        inscritos: [],
+        presentes: []
+      };
+
+      const tbody = document.getElementById('dashboard-cidades-tbody');
+      if (!tbody) return;
+
+      const rowsHtml = cidadesChart.labels.map((cidade, idx) => {
+        const ins = cidadesChart.inscritos[idx] || 0;
+        const pres = cidadesChart.presentes[idx] || 0;
+        const aus = Math.max(0, ins - pres);
+        const pct = ins > 0 ? ((pres / ins) * 100).toFixed(1) : '0.0';
+
+        return `
+          <tr>
+            <td class="fw-bold">${escapeHtml(cidade)}</td>
+            <td class="text-center">${ins}</td>
+            <td class="text-center fw-bold" style="color: #438E76;">${pres}</td>
+            <td class="text-center text-secondary">${aus}</td>
+            <td class="text-center"><span class="badge ${
+              Number(pct) >= 70 ? 'badge-ccb-ativo' : 'badge-ccb-encerrado'
+            }">${pct}%</span></td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = rowsHtml.join('');
+    }
+
+    /**
+     * Renderiza ou atualiza os gráficos de Barras (Cidades) e Doughnut (Funções) usando Chart.js.
+     * @param {Object} bundle Pacote de dados administrativos.
+     */
+    function renderDashboardCharts(bundle) {
+      if (!window.Chart) return;
+
+      const cidadesData = (bundle.charts && bundle.charts.cidades) || {
+        labels: [],
+        inscritos: [],
+        presentes: []
+      };
+      const funcoesData = (bundle.charts && bundle.charts.funcoes) || {
+        labels: [],
+        valores: []
+      };
+
+      const ctxCidades = document.getElementById('chart-cidades');
+      if (ctxCidades) {
+        if (AppState.admin.charts.cidades) {
+          AppState.admin.charts.cidades.destroy();
+        }
+
+        AppState.admin.charts.cidades = new Chart(ctxCidades, {
+          type: 'bar',
+          data: {
+            labels: cidadesData.labels,
+            datasets: [
+              {
+                label: 'Inscritos',
+                data: cidadesData.inscritos,
+                backgroundColor: '#033D60',
+                borderColor: '#033D60',
+                borderWidth: 1,
+                borderRadius: 4
+              },
+              {
+                label: 'Presentes no Local',
+                data: cidadesData.presentes,
+                backgroundColor: '#5DB196',
+                borderColor: '#5DB196',
+                borderWidth: 1,
+                borderRadius: 4
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: {
+                  font: { family: 'Verdana', size: 12 }
+                }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { font: { family: 'Verdana', size: 11 } }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { precision: 0, font: { family: 'Verdana', size: 11 } }
+              }
+            }
+          }
+        });
+      }
+
+      const ctxFuncoes = document.getElementById('chart-funcoes');
+      if (ctxFuncoes) {
+        if (AppState.admin.charts.funcoes) {
+          AppState.admin.charts.funcoes.destroy();
+        }
+
+        const hasData = funcoesData.valores.length > 0;
+        const labels = hasData ? funcoesData.labels : ['Sem inscrições no filtro'];
+        const values = hasData ? funcoesData.valores : [1];
+        const palette = hasData
+          ? [
+              '#033D60',
+              '#5DB196',
+              '#49656C',
+              '#FFCC66',
+              '#DC3C00',
+              '#1D5B79',
+              '#7895B2',
+              '#3A8891',
+              '#A2B5BB',
+              '#201E1E'
+            ]
+          : ['#CDD4DC'];
+
+        AppState.admin.charts.funcoes = new Chart(ctxFuncoes, {
+          type: 'doughnut',
+          data: {
+            labels,
+            datasets: [
+              {
+                data: values,
+                backgroundColor: palette.slice(0, labels.length),
+                borderColor: '#FFFFFF',
+                borderWidth: 2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  font: { family: 'Verdana', size: 11 },
+                  boxWidth: 14
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    /**
+     * Exporta os dados consolidados para arquivo Excel (.xlsx) via SheetJS.
+     */
+    function exportDashboardToExcel() {
+      if (!window.XLSX || !AppState.admin.bundle) {
+        toastr.warning('Dados ainda não carregados para exportação.');
+        return;
+      }
+
+      const bundle = AppState.admin.bundle;
+      const wb = XLSX.utils.book_new();
+
+      const kpiRows = [
+        ['CONGREGAÇÃO CRISTÃ NO BRASIL (CCB) - REGIONAL CAMPINAS/SP'],
+        ['COMISSÃO DE NEGOCIADORES DE SUPRIMENTOS (CNS) - RELATÓRIO OFICIAL'],
+        ['Logotipo CCB (Drive)', Environment.LOGOS ? Environment.LOGOS.CCB_PRIMARY_URL : 'https://drive.google.com/file/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM/view'],
+        ['Logotipo CNS (Drive)', Environment.LOGOS ? Environment.LOGOS.CNS_PRIMARY_URL : 'https://drive.google.com/file/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP/view'],
+        ['Data de Geração', formatTimestampBr(bundle.generatedAt)],
+        ['Escopo do Filtro', bundle.filterEventoId === 'ALL' ? 'Consolidado Histórico' : bundle.filterEventoId],
+        [],
+        ['INDICADOR (KPI)', 'VALOR'],
+        ['Total de Inscrições', bundle.kpis.totalInscricoes],
+        ['Presenças Confirmadas no Local', bundle.kpis.totalPresencas],
+        ['Taxa de Presença (%)', `${bundle.kpis.taxaPresenca}%`],
+        ['Total de Reuniões Catalogadas', bundle.kpis.totalReunioes],
+        [],
+        ['DISTRIBUIÇÃO POR CIDADE (REGIONAL CAMPINAS)', 'INSCRITOS', 'PRESENTES', 'AUSENTES']
+      ];
+
+      bundle.charts.cidades.labels.forEach((cidade, i) => {
+        const ins = bundle.charts.cidades.inscritos[i] || 0;
+        const pres = bundle.charts.cidades.presentes[i] || 0;
+        kpiRows.push([cidade, ins, pres, Math.max(0, ins - pres)]);
+      });
+
+      const wsKpi = XLSX.utils.aoa_to_sheet(kpiRows);
+      XLSX.utils.book_append_sheet(wb, wsKpi, 'Indicadores_CNS');
+
+      const inscricoesExport = (bundle.inscricoesFiltradas || []).map((ins) => ({
+        ID_INSCRICAO: ins.ID_INSCRICAO,
+        ID_EVENTO: ins.ID_EVENTO,
+        REUNIAO: ins.EVENTO_TITULO,
+        DATA_REUNIAO: formatDateBr(ins.EVENTO_DATA),
+        NOME_COMPLETO: ins.NOME_COMPLETO,
+        CIDADE: ins.CIDADE,
+        FUNCAO: ins.FUNCAO,
+        EMAIL: ins.EMAIL,
+        TELEFONE: ins.TELEFONE,
+        ACEITE_LGPD: ins.ACEITE_LGPD ? 'SIM' : 'NÃO',
+        DATA_HORA_ACEITE: ins.DATA_HORA_ACEITE,
+        PRESENCA_CONFIRMADA: ins.PRESENCA_CONFIRMADA ? 'SIM' : 'NÃO',
+        DATA_HORA_PRESENCA: ins.DATA_HORA_PRESENCA
+      }));
+
+      const wsInscricoes = XLSX.utils.json_to_sheet(
+        inscricoesExport.length > 0
+          ? inscricoesExport
+          : [{ AVISO: 'Nenhuma inscrição encontrada para o filtro selecionado.' }]
+      );
+      XLSX.utils.book_append_sheet(wb, wsInscricoes, 'Inscricoes');
+
+      const eventosExport = (bundle.eventos || []).map((ev) => ({
+        ID_EVENTO: ev.ID_EVENTO,
+        TITULO: ev.TITULO,
+        DATA_EVENTO: formatDateBr(ev.DATA_EVENTO),
+        HORA_EVENTO: ev.HORA_EVENTO,
+        HORA_LANCHE: ev.HORA_LANCHE,
+        LOCAL: ev.LOCAL,
+        STATUS: ev.STATUS,
+        INSCRITOS: ev.TOTAL_INSCRITOS || 0,
+        PRESENTES: ev.TOTAL_PRESENTES || 0
+      }));
+
+      const wsEventos = XLSX.utils.json_to_sheet(
+        eventosExport.length > 0 ? eventosExport : [{ AVISO: 'Nenhuma reunião cadastrada.' }]
+      );
+      XLSX.utils.book_append_sheet(wb, wsEventos, 'Eventos');
+
+      const fileDate = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Relatorio_Agenda_CNS_Campinas_${fileDate}.xlsx`);
+      toastr.success('Planilha Excel (.xlsx) exportada com sucesso!');
+    }
+
+    /* ========================================================================
+     * ABA 2: GESTÃO DE EVENTOS (CRUD + CARTAZ QR CODE DO EVENTO)
+     * ======================================================================== */
+    function renderEventosTable(eventos) {
+      const tbody = document.getElementById('eventos-tbody');
+      if (!tbody) return;
+
+      if (!eventos || eventos.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center text-secondary py-4">
+              Nenhuma reunião cadastrada até o momento. Clique em "Nova Reunião / Convocação" para criar.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = eventos
+        .map((ev) => {
+          const isAtivo = ev.STATUS === 'ATIVO';
+          const statusBadge = isAtivo
+            ? '<span class="badge-ccb-ativo">ATIVO</span>'
+            : '<span class="badge-ccb-encerrado">ENCERRADO</span>';
+          const toggleTarget = isAtivo ? 'ENCERRADO' : 'ATIVO';
+          const toggleLabel = isAtivo ? 'Encerrar' : 'Reativar';
+          const toggleIcon = isAtivo ? 'bi-lock-fill' : 'bi-unlock-fill';
+
+          return `
+            <tr>
+              <td data-label="Reunião">
+                <div class="fw-bold">${escapeHtml(ev.TITULO)}</div>
+                <code class="text-secondary" style="font-size: 0.72rem;">${escapeHtml(ev.ID_EVENTO)}</code>
+              </td>
+              <td data-label="Data" class="text-nowrap">${formatDateBr(ev.DATA_EVENTO)}</td>
+              <td data-label="Início" class="text-nowrap">${escapeHtml(ev.HORA_EVENTO)}h</td>
+              <td data-label="Lanche" class="text-nowrap">${escapeHtml(ev.HORA_LANCHE)}h</td>
+              <td data-label="Local">${escapeHtml(ev.LOCAL)}</td>
+              <td data-label="Inscritos / Presentes" class="text-center">
+                <span class="fw-bold">${ev.TOTAL_INSCRITOS || 0}</span> inscr. /
+                <span class="fw-bold" style="color: #438E76;">${ev.TOTAL_PRESENTES || 0}</span> pres.
+              </td>
+              <td data-label="Status" class="text-center">${statusBadge}</td>
+              <td data-label="Ações" class="text-end text-nowrap">
+                <div class="btn-group btn-group-sm">
+                  <button
+                    type="button"
+                    class="btn btn-ccb-success js-btn-poster-evento"
+                    data-id="${escapeHtml(ev.ID_EVENTO)}"
+                    title="Gerar QR Code e Link de Auto-Credenciamento do Evento"
+                  >
+                    <i class="bi bi-qr-code me-1"></i>QR Code do Evento
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary js-btn-edit-evento"
+                    data-id="${escapeHtml(ev.ID_EVENTO)}"
+                    title="Editar Reunião"
+                  >
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary js-btn-toggle-evento"
+                    data-id="${escapeHtml(ev.ID_EVENTO)}"
+                    data-next-status="${toggleTarget}"
+                    data-titulo="${escapeHtml(ev.TITULO)}"
+                    title="${toggleLabel} Convocação"
+                  >
+                    <i class="bi ${toggleIcon}"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger js-btn-delete-evento"
+                    data-id="${escapeHtml(ev.ID_EVENTO)}"
+                    data-titulo="${escapeHtml(ev.TITULO)}"
+                    title="Excluir Reunião"
+                  >
+                    <i class="bi bi-trash3-fill"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+
+    /**
+     * Abre o modal com o Cartaz QR Code e Link Exclusivo de Auto-Credenciamento do Evento.
+     * @param {Object} evento Objeto do evento.
+     */
+    function openEventoPosterModal(evento) {
+      if (!evento) return;
+
+      const baseUrl =
+        (AppState.portal.metadata && AppState.portal.metadata.webAppUrl) ||
+        window.location.href.split('?')[0];
+      const checkinLink = `${baseUrl}?view=checkin&evento=${encodeURIComponent(evento.ID_EVENTO)}`;
+
+      document.getElementById('poster-ev-titulo').textContent = evento.TITULO;
+      document.getElementById('poster-ev-info').textContent = `Data: ${formatDateBr(
+        evento.DATA_EVENTO
+      )} • Reunião: ${evento.HORA_EVENTO}h • Local: ${evento.LOCAL}`;
+      document.getElementById('poster-ev-link').value = checkinLink;
+
+      const qrBox = document.getElementById('poster-qr-canvas');
+      qrBox.innerHTML = '';
+
+      if (window.QRCode) {
+        new QRCode(qrBox, {
+          text: checkinLink,
+          width: 240,
+          height: 240,
+          colorDark: '#033D60',
+          colorLight: '#FFFFFF',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }
+
+      const modalEl = document.getElementById('modal-evento-poster');
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    /**
+     * Abre o modal para criar ou editar um evento.
+     * @param {Object|null} evento Se fornecido, preenche para edição.
+     */
+    function openEventoModal(evento = null) {
+      const form = document.getElementById('form-modal-evento');
+      FormAccessibilityBridge.resetFormValidation(form);
+
+      const modalTitle = document.getElementById('modal-evento-label');
+      if (evento) {
+        modalTitle.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Editar Reunião / Convocação';
+        document.getElementById('ev-id').value = evento.ID_EVENTO;
+        document.getElementById('ev-titulo').value = evento.TITULO;
+        document.getElementById('ev-data').value = evento.DATA_EVENTO;
+        document.getElementById('ev-hora').value = evento.HORA_EVENTO;
+        document.getElementById('ev-lanche').value = evento.HORA_LANCHE;
+        document.getElementById('ev-local').value = evento.LOCAL;
+        jQuery('#ev-status').val(evento.STATUS).trigger('change');
+      } else {
+        modalTitle.innerHTML = '<i class="bi bi-calendar-plus me-2"></i>Cadastrar Nova Reunião / Convocação';
+        form.reset();
+        document.getElementById('ev-id').value = '';
+        jQuery('#ev-status').val('ATIVO').trigger('change');
+      }
+
+      const modalEl = document.getElementById('modal-evento');
+      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      bsModal.show();
+    }
+
+    /**
+     * Submete o formulário de criação/edição de reunião.
+     * @param {Event} event Evento de submit.
+     */
+    async function handleSaveEventoSubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!FormAccessibilityBridge.validateFormAll(form)) {
+        toastr.warning('Preencha todos os campos obrigatórios da reunião.');
+        return;
+      }
+
+      const payload = {
+        ID_EVENTO: document.getElementById('ev-id').value.trim(),
+        TITULO: document.getElementById('ev-titulo').value.trim(),
+        DATA_EVENTO: document.getElementById('ev-data').value.trim(),
+        HORA_EVENTO: document.getElementById('ev-hora').value.trim(),
+        HORA_LANCHE: document.getElementById('ev-lanche').value.trim(),
+        LOCAL: document.getElementById('ev-local').value.trim(),
+        STATUS: jQuery('#ev-status').val() || 'ATIVO'
+      };
+
+      const isEdit = Boolean(payload.ID_EVENTO);
+      const confirm = await Swal.fire({
+        title: isEdit ? 'Salvar alterações da reunião?' : 'Confirmar criação da reunião?',
+        text: `${payload.TITULO} (${formatDateBr(payload.DATA_EVENTO)} às ${payload.HORA_EVENTO}h)`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#033D60',
+        cancelButtonColor: '#49656C',
+        confirmButtonText: 'Sim, Gravar',
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (!confirm.isConfirmed) return;
+
+      try {
+        setLoading(true, 'Salvando reunião na planilha...');
+        const response = await callServerRpc(
+          'apiAdminSaveEvento',
+          AppState.admin.secret,
+          payload,
+          AppState.admin.filterEventoId
+        );
+
+        const modalEl = document.getElementById('modal-evento');
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+        applyAdminBundle(response.bundle);
+        toastr.success(response.message);
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Alterna o status ATIVO / ENCERRADO de uma reunião com confirmação SweetAlert2.
+     */
+    async function handleToggleEventoStatus(idEvento, nextStatus, titulo) {
+      const confirm = await Swal.fire({
+        title: `Alterar status para ${nextStatus}?`,
+        text: `Reunião: "${titulo}"`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#033D60',
+        cancelButtonColor: '#49656C',
+        confirmButtonText: `Sim, definir como ${nextStatus}`,
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (!confirm.isConfirmed) return;
+
+      try {
+        setLoading(true, 'Atualizando status da reunião...');
+        const response = await callServerRpc(
+          'apiAdminUpdateEventoStatus',
+          AppState.admin.secret,
+          idEvento,
+          nextStatus,
+          AppState.admin.filterEventoId
+        );
+        applyAdminBundle(response.bundle);
+        toastr.success(response.message);
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Exclui um evento após confirmação crítica via SweetAlert2.
+     */
+    async function handleDeleteEvento(idEvento, titulo) {
+      const confirm = await Swal.fire({
+        title: 'Excluir Reunião Permanentemente?',
+        html: `A reunião <strong>${escapeHtml(
+          titulo
+        )}</strong> e todas as inscrições vinculadas a ela serão removidas da planilha.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#DC3C00',
+        cancelButtonColor: '#49656C',
+        confirmButtonText: 'Sim, Excluir Reunião',
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (!confirm.isConfirmed) return;
+
+      try {
+        setLoading(true, 'Excluindo reunião e inscrições vinculadas...');
+        const response = await callServerRpc(
+          'apiAdminDeleteEvento',
+          AppState.admin.secret,
+          idEvento,
+          AppState.admin.filterEventoId
+        );
+        applyAdminBundle(response.bundle);
+        toastr.success(response.message);
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /* ========================================================================
+     * ABA 3: GESTÃO DE INSCRIÇÕES (CRUD)
+     * ======================================================================== */
+    function renderInscricoesTable() {
+      const tbody = document.getElementById('inscricoes-tbody');
+      if (!tbody || !AppState.admin.bundle) return;
+
+      const todas = AppState.admin.bundle.inscricoes || [];
+      const filterEvento = jQuery('#ins-filter-evento').val() || 'ALL';
+      const filterCidade = jQuery('#ins-filter-cidade').val() || 'ALL';
+      const filterPresenca = jQuery('#ins-filter-presenca').val() || 'ALL';
+      const searchQuery = (document.getElementById('ins-search-input').value || '').trim().toLowerCase();
+
+      const filtradas = todas.filter((ins) => {
+        if (filterEvento !== 'ALL' && ins.ID_EVENTO.toLowerCase() !== filterEvento.toLowerCase()) {
+          return false;
+        }
+        if (filterCidade !== 'ALL' && ins.CIDADE !== filterCidade) {
+          return false;
+        }
+        if (filterPresenca === 'PRESENTE' && !ins.PRESENCA_CONFIRMADA) {
+          return false;
+        }
+        if (filterPresenca === 'PENDENTE' && ins.PRESENCA_CONFIRMADA) {
+          return false;
+        }
+        if (searchQuery) {
+          const matchNome = (ins.NOME_COMPLETO || '').toLowerCase().includes(searchQuery);
+          const matchUuid = (ins.ID_INSCRICAO || '').toLowerCase().includes(searchQuery);
+          const matchEmail = (ins.EMAIL || '').toLowerCase().includes(searchQuery);
+          const matchFuncao = (ins.FUNCAO || '').toLowerCase().includes(searchQuery);
+          if (!matchNome && !matchUuid && !matchEmail && !matchFuncao) return false;
+        }
+        return true;
+      });
+
+      if (filtradas.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="text-center text-secondary py-4">
+              Nenhum participante encontrado para os critérios de filtro selecionados.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtradas
+        .map((ins) => {
+          const presencaBadge = ins.PRESENCA_CONFIRMADA
+            ? `<span class="badge-ccb-ativo d-inline-block"><i class="bi bi-check2-circle me-1"></i>Presente</span>
+               <div class="text-secondary" style="font-size: 0.7rem;">${formatTimestampBr(ins.DATA_HORA_PRESENCA)}</div>`
+            : '<span class="badge-ccb-pendente"><i class="bi bi-hourglass-split me-1"></i>Aguardando</span>';
+
+          const lgpdBadge = ins.ACEITE_LGPD
+            ? `<span class="badge bg-light text-dark border" title="Aceito em ${escapeHtml(
+                formatTimestampBr(ins.DATA_HORA_ACEITE)
+              )}"><i class="bi bi-shield-check text-success me-1"></i>Sim</span>`
+            : '<span class="badge bg-danger">Não</span>';
+
+          return `
+            <tr>
+              <td data-label="Participante">
+                <div class="fw-bold">${escapeHtml(ins.NOME_COMPLETO)}</div>
+                <code class="text-secondary" style="font-size: 0.72rem;">${escapeHtml(ins.ID_INSCRICAO)}</code>
+              </td>
+              <td data-label="Cidade">${escapeHtml(ins.CIDADE)}</td>
+              <td data-label="Função">${escapeHtml(ins.FUNCAO)}</td>
+              <td data-label="Reunião">
+                <div class="small fw-bold">${escapeHtml(ins.EVENTO_TITULO)}</div>
+                <div class="text-secondary" style="font-size: 0.72rem;">${formatDateBr(ins.EVENTO_DATA)}</div>
+              </td>
+              <td data-label="Contato" class="small">
+                <div><i class="bi bi-envelope text-secondary me-1"></i>${escapeHtml(ins.EMAIL || '—')}</div>
+                <div><i class="bi bi-telephone text-secondary me-1"></i>${escapeHtml(ins.TELEFONE || '—')}</div>
+              </td>
+              <td data-label="LGPD" class="text-center">${lgpdBadge}</td>
+              <td data-label="Presença" class="text-center">${presencaBadge}</td>
+              <td data-label="Ações" class="text-end text-nowrap">
+                <div class="btn-group btn-group-sm">
+                  <button
+                    type="button"
+                    class="btn ${ins.PRESENCA_CONFIRMADA ? 'btn-outline-secondary' : 'btn-outline-success'} js-btn-toggle-presenca"
+                    data-id="${escapeHtml(ins.ID_INSCRICAO)}"
+                    data-nome="${escapeHtml(ins.NOME_COMPLETO)}"
+                    data-presenca="${ins.PRESENCA_CONFIRMADA ? 'true' : 'false'}"
+                    title="${ins.PRESENCA_CONFIRMADA ? 'Desmarcar Presença' : 'Confirmar Presença Manualmente'}"
+                  >
+                    <i class="bi ${ins.PRESENCA_CONFIRMADA ? 'bi-x-circle' : 'bi-check2-circle'}"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary js-btn-view-qr"
+                    data-id="${escapeHtml(ins.ID_INSCRICAO)}"
+                    data-nome="${escapeHtml(ins.NOME_COMPLETO)}"
+                    data-detalhes="${escapeHtml(ins.CIDADE)} • ${escapeHtml(ins.FUNCAO)}"
+                    title="Visualizar QR Code Individual"
+                  >
+                    <i class="bi bi-qr-code"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger js-btn-delete-inscricao"
+                    data-id="${escapeHtml(ins.ID_INSCRICAO)}"
+                    data-nome="${escapeHtml(ins.NOME_COMPLETO)}"
+                    title="Remover Inscrição"
+                  >
+                    <i class="bi bi-trash3-fill"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+
+    /**
+     * Submete o cadastro manual de participante pelo administrador.
+     */
+    async function handleManualInscricaoSubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const formValid = FormAccessibilityBridge.validateFormAll(form);
+      const contactValid = validateEitherEmailOrPhone('man-email', 'man-telefone', 10);
+      if (!formValid || !contactValid) {
+        toastr.warning('Preencha os campos obrigatórios e informe pelo menos o E-mail ou o Telefone.');
+        return;
+      }
+
+      const payload = {
+        ID_EVENTO: jQuery('#man-evento').val() || '',
+        NOME_COMPLETO: document.getElementById('man-nome').value.trim(),
+        CIDADE: jQuery('#man-cidade').val() || '',
+        FUNCAO: jQuery('#man-funcao').val() || '',
+        EMAIL: document.getElementById('man-email').value.trim(),
+        TELEFONE: document.getElementById('man-telefone').value.trim(),
+        PRESENCA_CONFIRMADA: jQuery('#man-presenca').val() === 'true',
+        ACEITE_LGPD: document.getElementById('man-lgpd').checked
+      };
+
+      try {
+        setLoading(true, 'Cadastrando participante manualmente...');
+        const response = await callServerRpc(
+          'apiAdminCreateManualInscricao',
+          AppState.admin.secret,
+          payload,
+          AppState.admin.filterEventoId
+        );
+
+        const modalEl = document.getElementById('modal-inscricao-manual');
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        form.reset();
+
+        applyAdminBundle(response.bundle);
+        toastr.success(response.message);
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Alterna manualmente a presença de um inscrito com confirmação via SweetAlert2.
+     */
+    async function handleTogglePresencaManual(idInscricao, nome, currentlyPresent) {
+      const nextState = !currentlyPresent;
+      const confirm = await Swal.fire({
+        title: nextState ? 'Confirmar Presença Manualmente?' : 'Desmarcar Presença?',
+        text: `Participante: ${nome}`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: nextState ? '#5DB196' : '#49656C',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: nextState ? 'Sim, Confirmar Presença' : 'Sim, Desmarcar',
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (!confirm.isConfirmed) return;
+
+      try {
+        setLoading(true, 'Atualizando registro de presença...');
+        const response = await callServerRpc(
+          'apiAdminSetPresencaManual',
+          AppState.admin.secret,
+          idInscricao,
+          nextState,
+          AppState.admin.filterEventoId
+        );
+        applyAdminBundle(response.bundle);
+        toastr.success(response.message);
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Remove uma inscrição após confirmação via SweetAlert2.
+     */
+    async function handleDeleteInscricao(idInscricao, nome) {
+      const confirm = await Swal.fire({
+        title: 'Remover Inscrição?',
+        text: `Deseja excluir permanentemente o registro de "${nome}"?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#DC3C00',
+        cancelButtonColor: '#49656C',
+        confirmButtonText: 'Sim, Remover',
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (!confirm.isConfirmed) return;
+
+      try {
+        setLoading(true, 'Removendo inscrição...');
+        const response = await callServerRpc(
+          'apiAdminDeleteInscricao',
+          AppState.admin.secret,
+          idInscricao,
+          AppState.admin.filterEventoId
+        );
+        applyAdminBundle(response.bundle);
+        toastr.success(response.message);
+      } catch (err) {
+        toastr.error(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /**
+     * Exibe o QR Code individual de qualquer inscrito em um modal administrativo.
+     */
+    function openAdminParticipantQrModal(idInscricao, nome, detalhes) {
+      document.getElementById('admin-qr-nome').textContent = nome;
+      document.getElementById('admin-qr-detalhes').textContent = detalhes;
+      document.getElementById('admin-qr-uuid').textContent = idInscricao;
+
+      const qrContainer = document.getElementById('admin-qr-canvas');
+      qrContainer.innerHTML = '';
+
+      if (window.QRCode) {
+        new QRCode(qrContainer, {
+          text: idInscricao,
+          width: 190,
+          height: 190,
+          colorDark: '#033D60',
+          colorLight: '#FFFFFF',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }
+
+      const modalEl = document.getElementById('modal-admin-qr');
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    /* ========================================================================
+     * ABA 4: TERMINAL DE CHECK-IN (RECEPÇÃO VIA CÂMERA HTML5-QRCODE)
+     * ======================================================================== */
+    async function detectAvailableCameras() {
+      if (!window.Html5Qrcode) {
+        toastr.error('Biblioteca html5-qrcode não carregada.');
+        return;
+      }
+
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        const selectCam = document.getElementById('checkin-select-camera');
+        if (!selectCam) return;
+
+        if (!devices || devices.length === 0) {
+          toastr.warning('Nenhuma câmera detectada neste dispositivo.');
+          return;
+        }
+
+        selectCam.innerHTML =
+          '<option value="environment">Câmera Traseira / Padrão</option>' +
+          devices
+            .map(
+              (cam, idx) =>
+                `<option value="${escapeHtml(cam.id)}">${escapeHtml(
+                  cam.label || `Câmera ${idx + 1}`
+                )}</option>`
+            )
+            .join('');
+        initAllSelect2();
+        toastr.info(`${devices.length} câmera(s) localizada(s).`);
+      } catch (err) {
+        toastr.warning('Permissão de câmera necessária para listar os dispositivos de vídeo.');
+      }
+    }
+
+    /**
+     * Inicia o leitor de QR Code em tempo real via html5-qrcode.
+     */
+    async function startQrScanner() {
+      if (!window.Html5Qrcode) {
+        toastr.error('Leitor html5-qrcode indisponível.');
+        return;
+      }
+
+      if (AppState.admin.scanner.isRunning) {
+        return;
+      }
+
+      const viewport = document.getElementById('qr-reader-viewport');
+      viewport.innerHTML = '';
+
+      const html5QrCode = new Html5Qrcode('qr-reader-viewport');
+      AppState.admin.scanner.instance = html5QrCode;
+
+      const selectedCam = jQuery('#checkin-select-camera').val() || 'environment';
+      const cameraConfig =
+        selectedCam === 'environment' ? { facingMode: 'environment' } : selectedCam;
+
+      try {
+        const dynamicQrBox = (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth || 280, viewfinderHeight || 280);
+          const boxSize = Math.max(150, Math.min(230, Math.floor(minEdge * 0.72)));
+          return { width: boxSize, height: boxSize };
+        };
+
+        await html5QrCode.start(
+          cameraConfig,
+          {
+            fps: 10,
+            qrbox: dynamicQrBox
+          },
+          (decodedText) => {
+            handleQrCodeScanned(decodedText);
+          },
+          () => {}
+        );
+
+        AppState.admin.scanner.isRunning = true;
+        document.getElementById('btn-start-scanner').classList.add('d-none');
+        document.getElementById('btn-stop-scanner').classList.remove('d-none');
+
+        const badge = document.getElementById('scanner-status-badge');
+        badge.className = 'badge badge-ccb-ativo';
+        badge.textContent = 'Câmera Ativa (Lendo QR Code)';
+        toastr.info('Leitor óptico de QR Code iniciado.');
+      } catch (err) {
+        toastr.error('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
+      }
+    }
+
+    /**
+     * Interrompe a leitura da câmera caso esteja ativa.
+     */
+    async function stopQrScanner() {
+      const scanner = AppState.admin.scanner;
+      if (!scanner.instance || !scanner.isRunning) return;
+
+      try {
+        await scanner.instance.stop();
+        await scanner.instance.clear();
+      } catch (_) {
+        // Ignora erro ao limpar instância
+      } finally {
+        scanner.isRunning = false;
+        scanner.instance = null;
+        const btnStart = document.getElementById('btn-start-scanner');
+        const btnStop = document.getElementById('btn-stop-scanner');
+        if (btnStart) btnStart.classList.remove('d-none');
+        if (btnStop) btnStop.classList.add('d-none');
+
+        const badge = document.getElementById('scanner-status-badge');
+        if (badge) {
+          badge.className = 'badge bg-secondary';
+          badge.textContent = 'Câmera Desligada';
+        }
+      }
+    }
+
+    /**
+     * Processa um código QR lido pela câmera ou inserido manualmente no terminal.
+     * @param {string} rawCode Texto lido do QR Code.
+     */
+    async function handleQrCodeScanned(rawCode) {
+      const cleanCode = String(rawCode || '').trim();
+      if (!cleanCode) return;
+
+      const scanner = AppState.admin.scanner;
+      const now = Date.now();
+
+      if (
+        scanner.isProcessingScan ||
+        (scanner.lastScannedCode === cleanCode && now - scanner.lastScannedTime < 3500)
+      ) {
+        return;
+      }
+
+      scanner.isProcessingScan = true;
+      scanner.lastScannedCode = cleanCode;
+      scanner.lastScannedTime = now;
+
+      const targetEventoId = jQuery('#checkin-select-evento').val() || 'ALL';
+      const bannerEl = document.getElementById('checkin-last-result');
+
+      try {
+        bannerEl.className = 'checkin-result-banner text-center';
+        bannerEl.innerHTML = `
+          <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
+          <strong class="d-block">Validando credencial na base Google Sheets...</strong>
+        `;
+
+        const response = await callServerRpc(
+          'apiAdminProcessQrCheckIn',
+          AppState.admin.secret,
+          cleanCode,
+          targetEventoId,
+          AppState.admin.filterEventoId
+        );
+
+        applyAdminBundle(response.bundle);
+        const ins = response.inscricao;
+
+        if (response.alreadyCheckedIn) {
+          playBeepSound('warning');
+          toastr.warning(response.message);
+          bannerEl.className = 'checkin-result-banner status-warn';
+          bannerEl.innerHTML = `
+            <div class="d-flex align-items-center gap-3">
+              <i class="bi bi-exclamation-circle-fill fs-1 text-warning"></i>
+              <div class="text-start">
+                <span class="badge-ccb-pendente mb-1 d-inline-block">CHECK-IN JÁ REALIZADO ANTERIORMENTE</span>
+                <h4 class="fs-5 mb-0">${escapeHtml(ins.NOME_COMPLETO)}</h4>
+                <p class="small mb-0">${escapeHtml(ins.CIDADE)} &bull; ${escapeHtml(ins.FUNCAO)}</p>
+                <small class="text-secondary">Registrado em: ${formatTimestampBr(ins.DATA_HORA_PRESENCA)}</small>
+              </div>
+            </div>
+          `;
+
+          Swal.fire({
+            title: 'Presença Já Confirmada',
+            html: `<strong>${escapeHtml(ins.NOME_COMPLETO)}</strong> (${escapeHtml(
+              ins.CIDADE
+            )}) já realizou check-in anteriormente.`,
+            icon: 'warning',
+            timer: 2600,
+            showConfirmButton: false
+          });
+        } else {
+          playBeepSound('success');
+          toastr.success(response.message);
+          bannerEl.className = 'checkin-result-banner status-ok';
+          bannerEl.innerHTML = `
+            <div class="d-flex align-items-center gap-3">
+              <i class="bi bi-check-circle-fill fs-1" style="color: #5DB196;"></i>
+              <div class="text-start">
+                <span class="badge-ccb-ativo mb-1 d-inline-block">PRESENÇA CONFIRMADA COM SUCESSO</span>
+                <h4 class="fs-5 mb-0">${escapeHtml(ins.NOME_COMPLETO)}</h4>
+                <p class="small mb-0">${escapeHtml(ins.CIDADE)} &bull; ${escapeHtml(ins.FUNCAO)}</p>
+                <small class="text-secondary">Horário: ${formatTimestampBr(ins.DATA_HORA_PRESENCA)}</small>
+              </div>
+            </div>
+          `;
+
+          Swal.fire({
+            title: 'Bem-vindo(a)! Presença Confirmada',
+            html: `
+              <div class="fs-5 fw-bold" style="color: #033D60;">${escapeHtml(ins.NOME_COMPLETO)}</div>
+              <div class="small text-secondary">${escapeHtml(ins.CIDADE)} &bull; ${escapeHtml(ins.FUNCAO)}</div>
+            `,
+            icon: 'success',
+            timer: 2200,
+            showConfirmButton: false
+          });
+        }
+
+        scanner.sessionHistory.unshift({
+          time: new Date().toLocaleTimeString('pt-BR'),
+          nome: ins.NOME_COMPLETO,
+          cidade: ins.CIDADE,
+          alreadyCheckedIn: response.alreadyCheckedIn
+        });
+        renderCheckinSessionHistory();
+      } catch (err) {
+        playBeepSound('error');
+        toastr.error(err.message);
+        bannerEl.className = 'checkin-result-banner status-error';
+        bannerEl.innerHTML = `
+          <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-x-octagon-fill fs-1 text-danger"></i>
+            <div class="text-start">
+              <span class="badge bg-danger mb-1">CREDENCIAL RECUSADA</span>
+              <p class="mb-0 fw-bold">${escapeHtml(err.message)}</p>
+            </div>
+          </div>
+        `;
+
+        Swal.fire({
+          title: 'Credencial Inválida',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#DC3C00'
+        });
+      } finally {
+        setTimeout(() => {
+          scanner.isProcessingScan = false;
+        }, 1200);
+      }
+    }
+
+    /**
+     * Atualiza a tabela de histórico de check-ins realizados na sessão atual.
+     */
+    function renderCheckinSessionHistory() {
+      const tbody = document.getElementById('checkin-history-tbody');
+      if (!tbody) return;
+
+      const list = AppState.admin.scanner.sessionHistory.slice(0, 12);
+      if (list.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="text-center text-secondary py-3">Nenhuma leitura realizada nesta sessão.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = list
+        .map(
+          (item) => `
+          <tr>
+            <td class="text-nowrap">${escapeHtml(item.time)}</td>
+            <td class="fw-bold">${escapeHtml(item.nome)}</td>
+            <td>${escapeHtml(item.cidade)}</td>
+            <td>
+              ${
+                item.alreadyCheckedIn
+                  ? '<span class="badge-ccb-pendente">Releitura</span>'
+                  : '<span class="badge-ccb-ativo">Confirmado</span>'
+              }
+            </td>
+          </tr>
+        `
+        )
+        .join('');
+    }
+
+    /* ========================================================================
+     * MÁSCARA DE TELEFONE E BINDING DE EVENTOS DO DOM
+     * ======================================================================== */
+    function formatPhoneMask(value) {
+      const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
+      if (digits.length === 0) return '';
+      if (digits.length <= 2) return `(${digits}`;
+      if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+      if (digits.length <= 10) {
+        return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+      }
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    }
+
+    function bindDomEvents() {
+      // Navegação Topo
+      document.getElementById('btn-nav-portal').addEventListener('click', () => {
+        AppState.portal.lastVoucher = null;
+        switchView('portal', { instantCheckInMode: false });
+      });
+      document.getElementById('btn-nav-checkin').addEventListener('click', () => switchView('checkin'));
+      document.getElementById('btn-nav-admin').addEventListener('click', () => switchView('admin'));
+      document.getElementById('btn-empty-go-admin').addEventListener('click', () => switchView('admin'));
+      document.getElementById('btn-admin-back-portal').addEventListener('click', () => switchView('portal'));
+      document.getElementById('btn-refresh-portal').addEventListener('click', refreshPortalState);
+
+      // Atalhos entre Portal e Auto Check-in Online
+      document.getElementById('btn-portal-goto-selfcheckin').addEventListener('click', () => {
+        switchView('checkin');
+      });
+      document.getElementById('btn-sc-empty-portal').addEventListener('click', () => {
+        switchView('portal');
+      });
+      document.getElementById('btn-sc-register-and-checkin').addEventListener('click', () => {
+        AppState.portal.lastVoucher = null;
+        switchView('portal', { instantCheckInMode: true });
+      });
+
+      const btnRecheckWin = document.getElementById('btn-sc-recheck-window');
+      if (btnRecheckWin) {
+        btnRecheckWin.addEventListener('click', () => {
+          const ev = AppState.portal.activeEvent;
+          const win = evaluateEventCheckInWindowClient(ev);
+          renderSelfCheckinView();
+          if (win.isOpen) {
+            toastr.success('O horário de credenciamento já foi liberado!');
+          } else {
+            toastr.info(win.lockMessage);
+          }
+        });
+      }
+
+      const btnLockedGotoPortal = document.getElementById('btn-sc-locked-goto-portal');
+      if (btnLockedGotoPortal) {
+        btnLockedGotoPortal.addEventListener('click', () => {
+          AppState.portal.lastVoucher = null;
+          switchView('portal', { instantCheckInMode: false });
+        });
+      }
+
+      // Botões de Auto-Detecção no Self Check-in
+      document.getElementById('btn-sc-oneclick-confirm').addEventListener('click', handleOneClickSelfCheckin);
+      document.getElementById('btn-sc-not-me').addEventListener('click', () => {
+        document.getElementById('sc-auto-detected-box').classList.add('d-none');
+        document.getElementById('sc-manual-form-box').classList.remove('d-none');
+        document.getElementById('sc-email').focus();
+      });
+
+      // Mudança de reunião ativa no Portal Público (quando há mais de uma ativa)
+      jQuery('#portal-select-evento').on('change', function () {
+        const selectedId = jQuery(this).val();
+        const found = (AppState.portal.activeEvents || []).find((e) => e.ID_EVENTO === selectedId);
+        if (found) {
+          AppState.portal.activeEvent = found;
+          populateActiveEventCard(found);
+        }
+      });
+
+      // Máscara de telefone nos inputs de inscrição completa
+      ['pub-telefone', 'man-telefone'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', (e) => {
+            e.target.value = formatPhoneMask(e.target.value);
+          });
+        }
+      });
+
+      // Bind de acessibilidade e submissão dos formulários
+      const formPublic = document.getElementById('form-inscricao-publica');
+      FormAccessibilityBridge.bindForm(formPublic);
+      formPublic.addEventListener('submit', handlePublicInscriptionSubmit);
+
+      const formSelfCheckin = document.getElementById('form-self-checkin');
+      FormAccessibilityBridge.bindForm(formSelfCheckin);
+      formSelfCheckin.addEventListener('submit', handleManualSelfCheckinSubmit);
+
+      const formAdminLogin = document.getElementById('form-admin-login');
+      FormAccessibilityBridge.bindForm(formAdminLogin);
+      formAdminLogin.addEventListener('submit', handleAdminLoginSubmit);
+
+      const formEvento = document.getElementById('form-modal-evento');
+      FormAccessibilityBridge.bindForm(formEvento);
+      formEvento.addEventListener('submit', handleSaveEventoSubmit);
+
+      const formManIns = document.getElementById('form-modal-inscricao');
+      FormAccessibilityBridge.bindForm(formManIns);
+      formManIns.addEventListener('submit', handleManualInscricaoSubmit);
+
+      // Vincula pares E-mail / Telefone (onde pelo menos um é obrigatório)
+      bindEitherEmailOrPhonePair('pub-email', 'pub-telefone');
+      bindEitherEmailOrPhonePair('sc-email', 'sc-telefone');
+      bindEitherEmailOrPhonePair('man-email', 'man-telefone');
+
+      // Botões do Comprovante QR Code
+      document.getElementById('btn-voucher-download').addEventListener('click', () => {
+        const uuid = document.getElementById('voucher-uuid').textContent || 'credencial';
+        downloadQrCodeFromContainer('voucher-qrcode', `Credencial_CNS_${uuid.substring(0, 8)}`);
+      });
+      document.getElementById('btn-voucher-print').addEventListener('click', () => window.print());
+      document.getElementById('btn-voucher-new').addEventListener('click', () => {
+        AppState.portal.lastVoucher = null;
+        formPublic.reset();
+        jQuery('#pub-cidade').val('').trigger('change');
+        jQuery('#pub-funcao').val('').trigger('change');
+        FormAccessibilityBridge.resetFormValidation(formPublic);
+        switchView('portal', { instantCheckInMode: false });
+      });
+
+      // Mostrar/Ocultar senha admin
+      document.getElementById('btn-toggle-secret-vis').addEventListener('click', () => {
+        const input = document.getElementById('admin-secret-input');
+        const icon = document.querySelector('#btn-toggle-secret-vis i');
+        if (input.type === 'password') {
+          input.type = 'text';
+          icon.className = 'bi bi-eye-slash';
+        } else {
+          input.type = 'password';
+          icon.className = 'bi bi-eye';
+        }
+      });
+
+      // Controles Administrativos Gerais
+      document.getElementById('btn-admin-refresh').addEventListener('click', () => {
+        reloadAdminDashboardData(AppState.admin.filterEventoId);
+      });
+
+      document.getElementById('btn-admin-logout').addEventListener('click', () => {
+        stopQrScanner();
+        AppState.admin.authenticated = false;
+        AppState.admin.secret = '';
+        AppState.admin.bundle = null;
+        document.getElementById('admin-secret-input').value = '';
+        document.getElementById('admin-workspace').classList.add('d-none');
+        document.getElementById('admin-auth-gate').classList.remove('d-none');
+        toastr.info('Sessão administrativa encerrada.');
+      });
+
+      // Filtro do Dashboard
+      jQuery('#admin-dashboard-filter').on('change', function () {
+        const selected = jQuery(this).val() || 'ALL';
+        if (selected !== AppState.admin.filterEventoId) {
+          reloadAdminDashboardData(selected);
+        }
+      });
+
+      // Exportações Dashboard (Excel e PDF)
+      document.getElementById('btn-export-xlsx').addEventListener('click', exportDashboardToExcel);
+      document.getElementById('btn-export-pdf').addEventListener('click', () => window.print());
+
+      // Botão Nova Reunião
+      document.getElementById('btn-novo-evento').addEventListener('click', () => openEventoModal(null));
+
+      // Delegação de cliques na Tabela de Eventos
+      document.getElementById('eventos-tbody').addEventListener('click', (e) => {
+        const btnPoster = e.target.closest('.js-btn-poster-evento');
+        if (btnPoster) {
+          const id = btnPoster.getAttribute('data-id');
+          const ev = (AppState.admin.bundle.eventos || []).find((x) => x.ID_EVENTO === id);
+          if (ev) openEventoPosterModal(ev);
+          return;
+        }
+
+        const btnEdit = e.target.closest('.js-btn-edit-evento');
+        if (btnEdit) {
+          const id = btnEdit.getAttribute('data-id');
+          const ev = (AppState.admin.bundle.eventos || []).find((x) => x.ID_EVENTO === id);
+          if (ev) openEventoModal(ev);
+          return;
+        }
+
+        const btnToggle = e.target.closest('.js-btn-toggle-evento');
+        if (btnToggle) {
+          handleToggleEventoStatus(
+            btnToggle.getAttribute('data-id'),
+            btnToggle.getAttribute('data-next-status'),
+            btnToggle.getAttribute('data-titulo')
+          );
+          return;
+        }
+
+        const btnDel = e.target.closest('

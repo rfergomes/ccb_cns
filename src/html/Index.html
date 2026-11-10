@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda CNS | CCB - Regional Campinas/SP</title>
+
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" crossorigin="anonymous">
+  <!-- Select2 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" crossorigin="anonymous">
+  <!-- SweetAlert2 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.min.css" rel="stylesheet" crossorigin="anonymous">
+  <!-- Toastr CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" crossorigin="anonymous">
+
+  <!-- Identidade Visual Institucional CCB -->
+  <?!= include('AppStyles') ?>
+</head>
+<body>
+  <!-- Overlay Global de Processamento -->
+  <div id="global-loading" class="ccb-loading-overlay d-none" role="status" aria-live="polite">
+    <div class="spinner-border text-light mb-3" style="width: 3rem; height: 3rem;"></div>
+    <div id="global-loading-text" class="fw-bold">Processando solicitação...</div>
+  </div>
+
+  <!-- Cabeçalho Institucional CCB com Logotipos CCB e CNS -->
+  <header class="ccb-navbar py-3 no-print">
+    <div class="container">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="ccb-brand-logos" aria-label="Logotipos Institucionais CCB e CNS">
+            <img
+              src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
+              alt="Logotipo CCB"
+              class="ccb-logo-img"
+            >
+            <span class="ccb-logo-divider" aria-hidden="true"></span>
+            <img
+              src="https://lh3.googleusercontent.com/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP=w400"
+              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP&sz=w400';"
+              alt="Logotipo CNS"
+              class="ccb-logo-img"
+            >
+          </div>
+          <div>
+            <h1 class="ccb-navbar-title">Agenda CNS &mdash; Regional Campinas/SP</h1>
+            <p class="ccb-navbar-subtitle">Comissão de Negociadores de Suprimentos &bull; Congregação Cristã no Brasil</p>
+          </div>
+        </div>
+        <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Navegação Principal">
+          <button type="button" id="btn-nav-portal" class="btn btn-sm btn-light fw-bold">
+            <i class="bi bi-calendar2-check me-1"></i>Portal de Convocação
+          </button>
+          <button type="button" id="btn-nav-checkin" class="btn btn-sm btn-outline-light fw-bold">
+            <i class="bi bi-phone-vibrate me-1"></i>Auto Check-in Online
+          </button>
+          <button type="button" id="btn-nav-admin" class="btn btn-sm btn-outline-light fw-bold">
+            <i class="bi bi-shield-lock me-1"></i>Painel Administrativo
+          </button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="container my-4 flex-grow-1">
+    <!-- Alerta de Erro de Configuração (PropertiesService) -->
+    <div id="config-error-banner" class="alert alert-danger border-2 d-none mb-4" role="alert">
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+        <div>
+          <h4 class="alert-heading fs-6 fw-bold mb-1">Configuração de Ambiente Pendente</h4>
+          <p id="config-error-message" class="mb-0 small"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         ROTA 1: PORTAL PÚBLICO DE CONVOCAÇÃO E INSCRIÇÃO (view=portal)
+         =================================================================== -->
+    <section id="view-portal" aria-label="Portal Público de Convocação">
+      <!-- Estado 1.A: Sem Evento Ativo -->
+      <div id="portal-empty-container" class="d-none">
+        <div class="ccb-card mx-auto" style="max-width: 680px;">
+          <div class="ccb-card-header text-center py-3">
+            <h2 class="fs-5"><i class="bi bi-calendar-x me-2"></i>Comunicado Oficial &mdash; Agenda CNS</h2>
+          </div>
+          <div class="p-4 p-md-5 text-center">
+            <div class="ccb-report-logos mb-4">
+              <img
+                src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
+                alt="Logotipo CCB"
+              >
+              <span class="ccb-logo-divider"></span>
+              <img
+                src="https://lh3.googleusercontent.com/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP=w400"
+                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP&sz=w400';"
+                alt="Logotipo CNS"
+              >
+            </div>
+            <h3 class="fs-5 mb-3">Não existem convocações abertas no momento</h3>
+            <p class="text-secondary mb-4 pretty-text">
+              A Paz de Deus. No momento não há reuniões ou convocações ativas agendadas para a
+              <strong>Comissão de Negociadores de Suprimentos (CNS) &mdash; Regional Campinas/SP</strong>.
+              Assim que uma nova reunião for aberta pela coordenação, o formulário de credenciamento estará disponível nesta página.
+            </p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap mobile-stack-buttons">
+              <button type="button" id="btn-refresh-portal" class="btn btn-ccb-primary">
+                <i class="bi bi-arrow-clockwise me-1"></i>Verificar Novamente
+              </button>
+              <button type="button" id="btn-empty-go-admin" class="btn btn-ccb-outline">
+                <i class="bi bi-shield-lock me-1"></i>Acesso Administrativo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estado 1.B: Convocação Ativa + Formulário de Inscrição -->
+      <div id="portal-active-container" class="d-none">
+        <div class="row g-4">
+          <!-- Coluna Esquerda: Detalhes da Convocação Oficial -->
+          <div class="col-lg-5">
+            <div class="ccb-card h-100">
+              <div class="ccb-card-header">
+                <div class="d-flex align-items-center justify-content-between">
+                  <h2 class="fs-5"><i class="bi bi-megaphone-fill me-2"></i>Convocação Oficial</h2>
+                  <span class="badge-ccb-ativo">INSCRIÇÕES ABERTAS</span>
+                </div>
+              </div>
+              <div class="ccb-card-subheader">
+                Regional Campinas/SP &bull; Comissão de Negociadores de Suprimentos
+              </div>
+              <div class="p-4">
+                <!-- Seletor de Reunião Ativa (visível quando há múltiplas reuniões ativas futuras) -->
+                <div id="portal-multi-event-selector-wrap" class="mb-3 d-none">
+                  <label for="portal-select-evento" class="form-label">Selecione a Reunião Ativa:</label>
+                  <select id="portal-select-evento" class="form-select js-select2" data-placeholder="Selecione a convocação...">
+                  </select>
+                </div>
+
+                <div class="mb-4">
+                  <span class="ccb-info-label">Título da Reunião / Convocação</span>
+                  <h3 id="portal-ev-titulo" class="fs-4 mb-0" style="color: var(--ccb-primary);">—</h3>
+                </div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-sm-6">
+                    <div class="ccb-info-tile">
+                      <span class="ccb-info-label"><i class="bi bi-calendar-event me-1"></i>Data da Reunião</span>
+                      <p id="portal-ev-data" class="ccb-info-value">—</p>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="ccb-info-tile">
+                      <span class="ccb-info-label"><i class="bi bi-clock me-1"></i>Início da Reunião</span>
+                      <p id="portal-ev-hora" class="ccb-info-value">—</p>
+                    </div>
+                  </div>
+                  <div class="col-sm-12">
+                    <div class="ccb-info-tile tile-lanche">
+                      <span class="ccb-info-label"><i class="bi bi-cup-hot me-1"></i>Horário do Lanche / Recepção</span>
+                      <p id="portal-ev-lanche" class="ccb-info-value">—</p>
+                    </div>
+                  </div>
+                  <div class="col-sm-12">
+                    <div class="ccb-info-tile tile-local">
+                      <span class="ccb-info-label"><i class="bi bi-geo-alt-fill me-1"></i>Local / Endereço</span>
+                      <p id="portal-ev-local" class="ccb-info-value">—</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="alert alert-light border small mb-3 pretty-text" style="border-color: var(--ccb-gray) !important;">
+                  <i class="bi bi-qr-code-scan text-primary me-1"></i>
+                  <strong>Duas Formas de Credenciamento na Reunião:</strong>
+                  <ol class="mb-1 mt-1 ps-3">
+                    <li>Apresente o <strong>QR Code individual</strong> gerado após sua inscrição na recepção; ou</li>
+                    <li>No local da reunião, escaneie o <strong>QR Code do Evento</strong> ou acesse o <strong>Auto Check-in Online</strong> para confirmar sua presença diretamente pelo seu celular.</li>
+                  </ol>
+                  <div id="portal-checkin-window-note" class="mt-2 pt-2 border-top text-secondary">
+                    <i class="bi bi-clock-history me-1"></i> O check-in de presença é liberado <strong>1 hora antes</strong> do início da reunião.
+                  </div>
+                </div>
+
+                <div class="d-grid">
+                  <button type="button" id="btn-portal-goto-selfcheckin" class="btn btn-ccb-outline btn-sm">
+                    <i class="bi bi-phone-vibrate me-1"></i>Já se inscreveu e está no local? Fazer Auto Check-in Online
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coluna Direita: Formulário de Inscrição e Credenciamento -->
+          <div class="col-lg-7">
+            <div class="ccb-card h-100">
+              <div class="ccb-card-header">
+                <h2 class="fs-5"><i class="bi bi-person-check-fill me-2"></i>Formulário de Inscrição e Credenciamento</h2>
+              </div>
+              <div class="p-4">
+                <!-- Aviso de modo Inscrição + Check-in imediato (quando vindo da tela de Auto Check-in) -->
+                <div id="portal-instant-checkin-alert" class="alert alert-success border d-none mb-3 small">
+                  <i class="bi bi-check2-circle me-1"></i>
+                  <strong>Modo Recepção Ativo:</strong> Ao concluir o preenchimento abaixo, sua inscrição e sua
+                  <strong>presença na reunião</strong> já serão confirmadas simultaneamente.
+                </div>
+
+                <form id="form-inscricao-publica" novalidate>
+                  <input type="hidden" id="pub-id-evento" name="ID_EVENTO" value="">
+                  <input type="hidden" id="pub-auto-checkin-now" name="AUTO_CHECKIN_NOW" value="false">
+
+                  <div class="row g-3">
+                    <!-- Nome Completo (Obrigatório) -->
+                    <div class="col-12">
+                      <label for="pub-nome" class="form-label">
+                        Nome Completo <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="pub-nome"
+                        name="NOME_COMPLETO"
+                        class="form-control"
+                        placeholder="Digite seu nome completo sem abreviações"
+                        required
+                        minlength="3"
+                        maxlength="150"
+                        autocomplete="name"
+                        aria-errormessage="err-pub-nome"
+                      >
+                      <div id="err-pub-nome" class="error-msg">
+                        <span aria-hidden="true">&#9888;</span> Informe seu nome completo (mínimo de 3 caracteres).
+                      </div>
+                    </div>
+
+                    <!-- Cidade (Regional Campinas - Obrigatório) -->
+                    <div class="col-md-6" id="wrap-pub-cidade">
+                      <label for="pub-cidade" class="form-label">
+                        Cidade / Grupo (Regional Campinas) <span class="text-danger">*</span>
+                      </label>
+                      <select
+                        id="pub-cidade"
+                        name="CIDADE"
+                        class="form-select js-select2"
+                        data-placeholder="Selecione a cidade..."
+                        required
+                        aria-errormessage="err-pub-cidade"
+                      >
+                        <option value="">Selecione a cidade...</option>
+                      </select>
+                      <div id="err-pub-cidade" class="error-msg">
+                        <span aria-hidden="true">&#9888;</span> Selecione sua Cidade na Regional Campinas.
+                      </div>
+                    </div>
+
+                    <!-- Função / Ministério na CNS (Obrigatório) -->
+                    <div class="col-md-6" id="wrap-pub-funcao">
+                      <label for="pub-funcao" class="form-label">
+                        Função / Ministério na CNS <span class="text-danger">*</span>
+                      </label>
+                      <select
+                        id="pub-funcao"
+                        name="FUNCAO"
+                        class="form-select js-select2"
+                        data-placeholder="Selecione sua função..."
+                        required
+                        aria-errormessage="err-pub-funcao"
+                      >
+                        <option value="">Selecione sua função...</option>
+                      </select>
+                      <div id="err-pub-funcao" class="error-msg">
+                        <span aria-hidden="true">&#9888;</span> Selecione sua Função / Ministério na CNS.
+                      </div>
+                    </div>
+
+                    <!-- E-mail (Obrigatório E-mail ou Telefone) -->
+                    <div class="col-md-6" id="wrap-pub-email">
+                      <label for="pub-email" class="form-label">
+                        E-mail <span class="text-secondary fw-normal small">(E-mail ou Telefone <span class="text-danger">*</span>)</span>
+                      </label>
+                      <input
+                        type="email"
+                        id="pub-email"
+                        name="EMAIL"
+                        class="form-control"
+                        placeholder="seu.email@dominio.com.br"
+                        maxlength="160"
+                        autocomplete="email"
+                        aria-errormessage="err-pub-email"
+                      >
+                      <div id="err-pub-email" class="error-msg">
+                        <span aria-hidden="true">&#9888;</span> Informe um e-mail válido ou preencha o telefone ao lado.
+                      </div>
+                    </div>
+
+                    <!-- Telefone / Celular com DDD (Obrigatório E-mail ou Telefone) -->
+                    <div class="col-md-6" id="wrap-pub-telefone">
+                      <label for="pub-telefone" class="form-label">
+                        Telefone / Celular <span class="text-secondary fw-normal small">(E-mail ou Telefone <span class="text-danger">*</span>)</span>
+                      </label>
+                      <input
+                        type="tel"
+                        id="pub-telefone"
+                        name="TELEFONE"
+                        class="form-control"
+                        placeholder="(19) 99999-9999"
+                        maxlength="20"
+                        autocomplete="tel"
+                        aria-errormessage="err-pub-telefone"
+                      >
+                      <div id="err-pub-telefone" class="error-msg">
+                        <span aria-hidden="true">&#9888;</span> Informe um telefone com DDD ou preencha o e-mail ao lado.
+                      </div>
+                    </div>
+
+                    <!-- Termo Compulsório LGPD -->
+                    <div class="col-12 mt-3">
+                      <div class="lgpd-consent-box" id="wrap-pub-lgpd">
+                        <div class="d-flex align-items-start gap-2">
+                          <label for="pub-lgpd" class="d-flex align-items-start gap-2 mb-0" style="cursor: pointer;">
+                            <input
+                              type="checkbox"
+                              id="pub-lgpd"
+                              name="ACEITE_LGPD"
+                              class="ccb-checkbox-native mt-1"
+                              required
+                              aria-errormessage="err-pub-lgpd"
+                            >
+                            <span class="lgpd-text pretty-text">
+                              <strong>Termo de Consentimento LGPD (Lei nº 13.709/2018):</strong> Declaro estar ciente e concordo
+                              com o tratamento dos meus dados pessoais informados neste formulário para a finalidade exclusiva de
+                              organização, controle de presença, dimensionamento de recepção e gestão administrativa das reuniões e
+                              treinamentos da <strong>Comissão de Negociadores de Suprimentos (CNS) da Congregação Cristã no Brasil (CCB) &mdash; Regional Campinas/SP</strong>,
+                              vedado o compartilhamento com terceiros para fins diversos. <strong class="text-danger">*</strong>
+                            </span>
+                          </label>
+                        </div>
+                        <div id="err-pub-lgpd" class="error-msg mt-2">
+                          <span aria-hidden="true">&#9888;</span> É obrigatório aceitar o Termo de Consentimento LGPD para prosseguir.
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Botão de Envio -->
+                    <div class="col-12 mt-4 d-grid">
+                      <button type="submit" id="btn-submit-inscricao" class="btn btn-ccb-primary btn-lg">
+                        <i class="bi bi-check2-circle me-2"></i>Confirmar Inscrição e Gerar Credencial QR Code
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estado 1.C: Comprovante de Credenciamento com QR Code e Logotipos -->
+      <div id="portal-voucher-container" class="d-none">
+        <div class="qr-voucher-container shadow-sm">
+          <div class="text-center border-bottom pb-3 mb-3" style="border-color: var(--ccb-gray) !important;">
+            <div class="ccb-report-logos mb-3">
+              <img
+                src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
+                alt="Logotipo CCB"
+              >
+              <span class="ccb-logo-divider"></span>
+              <img
+                src="https://lh3.googleusercontent.com/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP=w400"
+                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP&sz=w400';"
+                alt="Logotipo CNS"
+              >
+            </div>
+            <div>
+              <span id="voucher-status-badge" class="badge-ccb-ativo mb-2 d-inline-block">CREDENCIAL EMITIDA</span>
+            </div>
+            <h2 class="fs-5 mb-1">Comprovante de Credenciamento &mdash; CNS</h2>
+            <p class="small text-secondary mb-0">Congregação Cristã no Brasil &bull; Regional Campinas/SP</p>
+          </div>
+
+          <div class="text-center my-3">
+            <div id="voucher-qrcode" class="qr-canvas-box" aria-label="Código QR de Credenciamento"></div>
+            <div class="mt-2">
+              <span class="small text-secondary d-block">Identificador Único (UUID):</span>
+              <code id="voucher-uuid" class="fw-bold" style="color: var(--ccb-primary); font-size: 0.85rem;">—</code>
+            </div>
+          </div>
+
+          <div class="bg-light border rounded p-3 mb-3">
+            <div class="row g-2 small">
+              <div class="col-12">
+                <span class="text-secondary d-block">Participante:</span>
+                <strong id="voucher-nome" class="fs-6">—</strong>
+              </div>
+              <div class="col-sm-6">
+                <span class="text-secondary d-block">Cidade / Grupo:</span>
+                <strong id="voucher-cidade">—</strong>
+              </div>
+              <div class="col-sm-6">
+                <span class="text-secondary d-block">Função / Ministério:</span>
+                <strong id="voucher-funcao">—</strong>
+              </div>
+              <div class="col-sm-6">
+                <span class="text-secondary d-block">E-mail:</span>
+                <strong id="voucher-email">—</strong>
+              </div>
+              <div class="col-sm-6">
+                <span class="text-secondary d-block">Telefone:</span>
+                <strong id="voucher-telefone">—</strong>
+              </div>
+              <div class="col-12 border-top pt-2 mt-2">
+                <span class="text-secondary d-block">Convocação / Reunião:</span>
+                <strong id="voucher-evento-titulo" style="color: var(--ccb-primary);">—</strong>
+              </div>
+              <div class="col-sm-4">
+                <span class="text-secondary d-block">Data:</span>
+                <strong id="voucher-evento-data">—</strong>
+              </div>
+              <div class="col-sm-4">
+                <span class="text-secondary d-block">Reunião:</span>
+                <strong id="voucher-evento-hora">—</strong>
+              </div>
+              <div class="col-sm-4">
+                <span class="text-secondary d-block">Lanche:</span>
+                <strong id="voucher-evento-lanche">—</strong>
+              </div>
+              <div class="col-12">
+                <span class="text-secondary d-block">Local:</span>
+                <strong id="voucher-evento-local">—</strong>
+              </div>
+              <div class="col-12 border-top pt-2 mt-2 text-secondary" style="font-size: 0.75rem;">
+                <div>Consentimento LGPD registrado em: <span id="voucher-lgpd-timestamp">—</span></div>
+                <div id="voucher-presenca-info" class="fw-bold text-success mt-1 d-none"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap justify-content-center gap-2 no-print mobile-stack-buttons">
+            <button type="button" id="btn-voucher-download" class="btn btn-ccb-success">
+              <i class="bi bi-download me-1"></i>Salvar QR Code (PNG)
+            </button>
+            <button type="button" id="btn-voucher-print" class="btn btn-ccb-primary">
+              <i class="bi bi-printer me-1"></i>Imprimir / Salvar PDF
+            </button>
+            <button type="button" id="btn-voucher-new" class="btn btn-ccb-outline">
+              <i class="bi bi-arrow-left me-1"></i>Voltar ao Início
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         ROTA 2: AUTO-CREDENCIAMENTO ONLINE DO PARTICIPANTE (view=checkin)
+         =================================================================== -->
+    <section id="view-checkin" class="d-none" aria-label="Auto-Credenciamento Online do Participante">
+      <div class="mx-auto" style="max-width: 680px;">
+        <!-- Quando não há evento ativo -->
+        <div id="selfcheckin-empty-card" class="ccb-card d-none text-center p-4 p-md-5">
+          <i class="bi bi-calendar-x display-4 text-secondary d-block mb-3"></i>
+          <h2 class="fs-5 mb-2">Nenhuma reunião ativa para Auto Check-in no momento</h2>
+          <p class="text-secondary small mb-4">
+            O credenciamento online fica disponível apenas para reuniões com status ATIVO.
+          </p>
+          <button type="button" id="btn-sc-empty-portal" class="btn btn-ccb-primary">
+            Voltar ao Portal de Convocação
+          </button>
+        </div>
+
+        <!-- Quando há evento ativo -->
+        <div id="selfcheckin-active-card" class="ccb-card d-none">
+          <div class="ccb-card-header d-flex align-items-center justify-content-between">
+            <h2 class="fs-5"><i class="bi bi-phone-vibrate-fill me-2"></i>Auto-Credenciamento Online (Check-in)</h2>
+            <span id="sc-header-status-badge" class="badge-ccb-ativo">RECEPÇÃO ONLINE</span>
+          </div>
+          <div class="ccb-card-subheader">
+            Confirme sua presença na reunião diretamente pelo seu celular (liberado 1h antes do evento)
+          </div>
+
+          <div class="p-4">
+            <!-- Resumo do Evento Ativo -->
+            <div class="bg-light border rounded p-3 mb-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <span class="ccb-info-label mb-0">Reunião / Convocação Ativa</span>
+                  <h3 id="sc-ev-titulo" class="fs-5 mb-1" style="color: var(--ccb-primary);">—</h3>
+                  <div class="small text-secondary">
+                    <i class="bi bi-calendar-event me-1"></i><span id="sc-ev-data">—</span> &bull;
+                    <i class="bi bi-clock me-1"></i>Reunião: <span id="sc-ev-hora">—</span> &bull;
+                    <i class="bi bi-geo-alt me-1"></i><span id="sc-ev-local">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 0. Aviso de Bloqueio de Janela de Check-in (Até 1h antes do início da reunião) -->
+            <div id="sc-locked-window-box" class="alert alert-warning border mb-0 p-4 text-center d-none" style="border-color: var(--ccb-yellow) !important; background-color: #FFFDF5;">
+              <i class="bi bi-clock-history display-5 d-block mb-2" style="color: var(--ccb-primary);"></i>
+              <span class="badge-ccb-pendente mb-2 d-inline-block">CHECK-IN AGUARDANDO HORÁRIO DE LIBERAÇÃO</span>
+              <h4 class="fs-5 mb-2" style="color: var(--ccb-primary);">
+                Credenciamento de Presença Liberado 1 Hora Antes da Reunião
+              </h4>
+              <p id="sc-locked-window-msg" class="small text-secondary mb-3 pretty-text">
+                O check-in de presença para esta reunião estará disponível a partir de 1 hora antes do início programado.
+              </p>
+              <div class="bg-white border rounded p-3 mb-3 mx-auto" style="max-width: 440px;">
+                <span class="ccb-info-label mb-1">Abertura do Check-in de Presença</span>
+                <div id="sc-locked-release-datetime" class="fs-5 fw-bold" style="color: var(--ccb-primary);">—</div>
+              </div>
+              <div class="d-flex flex-wrap justify-content-center gap-2 mobile-stack-buttons">
+                <button type="button" id="btn-sc-recheck-window" class="btn btn-ccb-primary btn-sm">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Verificar Horário Novamente
+                </button>
+                <button type="button" id="btn-sc-locked-goto-portal" class="btn btn-ccb-outline btn-sm">
+                  <i class="bi bi-person-plus me-1"></i>Ainda não se inscreveu? Fazer Inscrição Antecipada
+                </button>
+              </div>
+            </div>
+
+            <!-- 1. Cartão de Auto-Detecção (Conta Google Logada ou Credencial Salva no Aparelho) -->
+            <div id="sc-auto-detected-box" class="auto-match-card mb-4 d-none">
+              <div class="d-flex align-items-start gap-3">
+                <i class="bi bi-person-check-fill fs-2" style="color: var(--ccb-green-dark);"></i>
+                <div class="flex-grow-1">
+                  <span id="sc-auto-source-badge" class="badge bg-success mb-1">Conta Google Identificada</span>
+                  <h4 id="sc-auto-nome" class="fs-5 mb-1">—</h4>
+                  <p id="sc-auto-detalhes" class="small text-secondary mb-2">—</p>
+                  <div id="sc-auto-already-msg" class="small fw-bold text-success mb-2 d-none">
+                    <i class="bi bi-check-all me-1"></i>Sua presença já está registrada para esta reunião!
+                  </div>
+                  <div class="d-flex flex-wrap gap-2 mobile-stack-buttons">
+                    <button type="button" id="btn-sc-oneclick-confirm" class="btn btn-ccb-success">
+                      <i class="bi bi-check2-circle me-1"></i>Confirmar Minha Presença Agora
+                    </button>
+                    <button type="button" id="btn-sc-not-me" class="btn btn-sm btn-outline-secondary">
+                      Não sou eu / Usar outro e-mail
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Formulário de Confirmação Segura (E-mail OU Telefone de Inscrição) -->
+            <div id="sc-manual-form-box">
+              <h4 class="fs-6 mb-2">
+                <i class="bi bi-shield-check text-primary me-1"></i>Confirmação por E-mail ou Telefone
+              </h4>
+              <p class="small text-secondary mb-3 pretty-text">
+                Informe o <strong>e-mail</strong> <u>ou</u> o <strong>telefone/celular</strong> (completo ou os <strong>4 últimos dígitos</strong>) utilizado na sua inscrição. <strong>Pelo menos um dos campos deve ser preenchido:</strong>
+              </p>
+
+              <form id="form-self-checkin" novalidate>
+                <div class="row g-3">
+                  <div class="col-md-7" id="wrap-sc-email">
+                    <label for="sc-email" class="form-label">
+                      E-mail da Inscrição <span class="text-secondary fw-normal small">(ou preencha o Telefone)</span>
+                    </label>
+                    <input
+                      type="email"
+                      id="sc-email"
+                      class="form-control"
+                      placeholder="Digite o e-mail cadastrado..."
+                      autocomplete="email"
+                      aria-errormessage="err-sc-email"
+                    >
+                    <div id="err-sc-email" class="error-msg">
+                      <span aria-hidden="true">&#9888;</span> Informe o e-mail ou preencha o campo de telefone ao lado.
+                    </div>
+                  </div>
+
+                  <div class="col-md-5" id="wrap-sc-telefone">
+                    <label for="sc-telefone" class="form-label">
+                      Telefone ou 4 Últimos Dígitos <span class="text-secondary fw-normal small">(ou E-mail)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      id="sc-telefone"
+                      class="form-control"
+                      placeholder="(19) 99999-9999 ou 9999"
+                      maxlength="20"
+                      autocomplete="tel"
+                      aria-errormessage="err-sc-telefone"
+                    >
+                    <div id="err-sc-telefone" class="error-msg">
+                      <span aria-hidden="true">&#9888;</span> Informe o telefone (ou 4 últimos dígitos) ou preencha o e-mail.
+                    </div>
+                  </div>
+
+                  <div class="col-12 d-grid mt-3">
+                    <button type="submit" class="btn btn-ccb-primary btn-lg">
+                      <i class="bi bi-check2-circle me-2"></i>Validar Dados e Confirmar Minha Presença
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <!-- 3. Opção para quem ainda não se inscreveu -->
+            <div id="sc-not-registered-footer" class="border-top mt-4 pt-3 text-center">
+              <p class="small text-secondary mb-2">
+                Ainda não realizou sua inscrição prévia para esta reunião?
+              </p>
+              <button type="button" id="btn-sc-register-and-checkin" class="btn btn-ccb-outline btn-sm">
+                <i class="bi bi-person-plus me-1"></i>Fazer Inscrição e Confirmar Presença Agora
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         ROTA 3: PAINEL ADMINISTRATIVO E RECEPÇÃO (view=admin)
+         =================================================================== -->
+    <section id="view-admin" class="d-none" aria-label="Painel Administrativo CNS">
+      <!-- Autenticação por Chave Mestra (ADMIN_SECRET) -->
+      <div id="admin-auth-gate" class="mx-auto my-4" style="max-width: 480px;">
+        <div class="ccb-card">
+          <div class="ccb-card-header text-center">
+            <h2 class="fs-5"><i class="bi bi-shield-lock-fill me-2"></i>Autenticação Administrativa</h2>
+          </div>
+          <div class="ccb-card-subheader text-center">
+            Acesso restrito à Coordenação e Secretaria da CNS
+          </div>
+          <div class="p-4">
+            <form id="form-admin-login" novalidate>
+              <div class="mb-3">
+                <label for="admin-secret-input" class="form-label">Chave Mestra Administrativa (<code class="text-dark">ADMIN_SECRET</code>)</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light"><i class="bi bi-key-fill text-primary"></i></span>
+                  <input
+                    type="password"
+                    id="admin-secret-input"
+                    class="form-control"
+                    placeholder="Informe a chave mestra..."
+                    required
+                    autocomplete="current-password"
+                    aria-errormessage="err-admin-secret"
+                  >
+                  <button type="button" id="btn-toggle-secret-vis" class="btn btn-outline-secondary" title="Mostrar/Ocultar Chave">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                </div>
+                <div id="err-admin-secret" class="error-msg">
+                  <span aria-hidden="true">&#9888;</span> Informe a chave administrativa para acessar o painel.
+                </div>
+              </div>
+              <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-ccb-primary">
+                  <i class="bi bi-unlock-fill me-1"></i>Acessar Painel Administrativo
+                </button>
+                <button type="button" id="btn-admin-back-portal" class="btn btn-ccb-outline btn-sm">
+                  Voltar ao Portal Público
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workspace Administrativo (Visível após autenticação) -->
+      <div id="admin-workspace" class="d-none">
+        <!-- Cabeçalho exclusivo para impressão de relatório PDF com Logotipos CCB e CNS -->
+        <div class="print-only-header d-none">
+          <div>
+            <h2 class="fs-4 mb-1">Relatório Oficial de Participação &mdash; Agenda CNS</h2>
+            <p class="small mb-0">
+              Congregação Cristã no Brasil (CCB) &bull; Regional Campinas/SP &bull;
+              Emitido em: <span id="print-report-timestamp"></span>
+            </p>
+          </div>
+          <div class="ccb-report-logos">
+            <img
+              src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
+              alt="Logotipo CCB"
+            >
+            <span class="ccb-logo-divider"></span>
+            <img
+              src="https://lh3.googleusercontent.com/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP=w400"
+              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP&sz=w400';"
+              alt="Logotipo CNS"
+            >
+          </div>
+        </div>
+
+        <!-- Barra de Navegação das 4 Abas Administrativas -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 no-print">
+          <ul class="nav nav-tabs ccb-nav-tabs border-0" id="adminTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="tab-btn-dashboard" data-bs-toggle="tab" data-bs-target="#tab-dashboard" type="button" role="tab">
+                <i class="bi bi-bar-chart-line-fill me-1"></i>1. Dashboards &amp; Indicadores
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="tab-btn-eventos" data-bs-toggle="tab" data-bs-target="#tab-eventos" type="button" role="tab">
+                <i class="bi bi-calendar3-event me-1"></i>2. Gestão de Eventos
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="tab-btn-inscricoes" data-bs-toggle="tab" data-bs-target="#tab-inscricoes" type="button" role="tab">
+                <i class="bi bi-people-fill me-1"></i>3. Gestão de Inscrições
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="tab-btn-checkin" data-bs-toggle="tab" data-bs-target="#tab-checkin" type="button" role="tab">
+                <i class="bi bi-qr-code-scan me-1"></i>4. Terminal de Check-in (Recepção)
+              </button>
+            </li>
+          </ul>
+
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" id="btn-admin-refresh" class="btn btn-sm btn-ccb-slate" title="Sincronizar com Google Sheets">
+              <i class="bi bi-arrow-repeat me-1"></i>Atualizar Dados
+            </button>
+            <button type="button" id="btn-admin-logout" class="btn btn-sm btn-ccb-danger" title="Encerrar sessão administrativa">
+              <i class="bi bi-box-arrow-right me-1"></i>Sair
+            </button>
+          </div>
+        </div>
+
+        <div class="tab-content" id="adminTabsContent">
+          <!-- ===============================================================
+               ABA 1: DASHBOARDS & INDICADORES
+               =============================================================== -->
+          <div class="tab-pane fade show active" id="tab-dashboard" role="tabpanel" aria-labelledby="tab-btn-dashboard">
+            <!-- Barra de Filtro e Exportação -->
+            <div class="ccb-card p-3 mb-4 no-print">
+              <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                  <label for="admin-dashboard-filter" class="form-label mb-1">
+                    <i class="bi bi-funnel-fill text-primary me-1"></i>Escopo de Análise (Filtro de Reunião):
+                  </label>
+                  <select id="admin-dashboard-filter" class="form-select js-select2">
+                    <option value="ALL">Consolidado Histórico (Todas as Reuniões)</option>
+                  </select>
+                </div>
+                <div class="col-md-6 d-flex flex-wrap justify-content-md-end gap-2 mobile-stack-buttons">
+                  <button type="button" id="btn-export-xlsx" class="btn btn-ccb-success">
+                    <i class="bi bi-file-earmark-excel-fill me-1"></i>Exportar Excel (.xlsx)
+                  </button>
+                  <button type="button" id="btn-export-pdf" class="btn btn-ccb-primary">
+                    <i class="bi bi-file-earmark-pdf-fill me-1"></i>Emitir Relatório PDF / Imprimir
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cards de KPIs de Topo -->
+            <div class="row g-3 mb-4">
+              <div class="col-sm-6 col-xl-3">
+                <div class="kpi-card">
+                  <div class="kpi-title"><i class="bi bi-journal-check me-1"></i>Total de Inscrições</div>
+                  <div id="kpi-total-inscricoes" class="kpi-value">0</div>
+                  <p class="kpi-subtitle">Credenciamentos registrados no filtro</p>
+                </div>
+              </div>
+              <div class="col-sm-6 col-xl-3">
+                <div class="kpi-card kpi-green">
+                  <div class="kpi-title"><i class="bi bi-person-check-fill me-1"></i>Presenças no Local</div>
+                  <div id="kpi-total-presencas" class="kpi-value">0</div>
+                  <p class="kpi-subtitle">Check-ins confirmados (Recepção + Online)</p>
+                </div>
+              </div>
+              <div class="col-sm-6 col-xl-3">
+                <div class="kpi-card kpi-yellow">
+                  <div class="kpi-title"><i class="bi bi-percent me-1"></i>Taxa de Presença</div>
+                  <div id="kpi-taxa-presenca" class="kpi-value">0%</div>
+                  <p class="kpi-subtitle">Relação Presentes / Inscritos</p>
+                </div>
+              </div>
+              <div class="col-sm-6 col-xl-3">
+                <div class="kpi-card kpi-slate">
+                  <div class="kpi-title"><i class="bi bi-calendar2-range-fill me-1"></i>Reuniões Catalogadas</div>
+                  <div id="kpi-total-reunioes" class="kpi-value">0</div>
+                  <p class="kpi-subtitle">Total histórico na base EVENTOS</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gráficos Chart.js -->
+            <div class="row g-4 mb-4">
+              <!-- Gráfico de Barras: Distribuição por Cidade -->
+              <div class="col-lg-7">
+                <div class="ccb-card h-100">
+                  <div class="ccb-card-header">
+                    <h3 class="fs-6"><i class="bi bi-building me-2"></i>Distribuição por Cidade &mdash; Regional Campinas</h3>
+                  </div>
+                  <div class="p-3">
+                    <div style="position: relative; height: 340px;">
+                      <canvas id="chart-cidades"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gráfico Doughnut: Distribuição por Função/Ministério -->
+              <div class="col-lg-5">
+                <div class="ccb-card h-100">
+                  <div class="ccb-card-header">
+                    <h3 class="fs-6"><i class="bi bi-pie-chart-fill me-2"></i>Distribuição por Função / Ministério</h3>
+                  </div>
+                  <div class="p-3">
+                    <div style="position: relative; height: 340px;">
+                      <canvas id="chart-funcoes"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quadro Resumo por Cidade (Visível no Dashboard e em Impressões PDF) -->
+            <div class="ccb-card">
+              <div class="ccb-card-header">
+                <h3 class="fs-6"><i class="bi bi-table me-2"></i>Quadro Sintético por Cidade / Grupo (Regional Campinas)</h3>
+              </div>
+              <div class="table-responsive">
+                <table class="table ccb-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>Cidade / Grupo</th>
+                      <th class="text-center">Inscritos</th>
+                      <th class="text-center">Presentes no Local</th>
+                      <th class="text-center">Ausentes / Pendentes</th>
+                      <th class="text-center">Aproveitamento (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-cidades-tbody">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===============================================================
+               ABA 2: GESTÃO DE EVENTOS (CRUD + QR CODE DO EVENTO)
+               =============================================================== -->
+          <div class="tab-pane fade" id="tab-eventos" role="tabpanel" aria-labelledby="tab-btn-eventos">
+            <div class="ccb-card">
+              <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h3 class="fs-5"><i class="bi bi-calendar3-event me-2"></i>Gestão de Reuniões e QR Code de Auto-Credenciamento</h3>
+                <button type="button" id="btn-novo-evento" class="btn btn-sm btn-light fw-bold">
+                  <i class="bi bi-plus-circle-fill text-primary me-1"></i>Nova Reunião / Convocação
+                </button>
+              </div>
+              <div class="p-3">
+                <div class="alert alert-light border small mb-3">
+                  <i class="bi bi-qr-code text-primary me-1"></i>
+                  <strong>Dica de Recepção:</strong> Clique no botão <span class="badge bg-success"><i class="bi bi-qr-code me-1"></i>QR Code do Evento</span>
+                  na linha da reunião ativa para gerar o cartaz/link exclusivo de <strong>Auto-Credenciamento Online</strong> para que os próprios participantes escaneiem na entrada.
+                </div>
+                <div class="table-responsive">
+                  <table class="table ccb-table ccb-table-mobile-cards mb-0">
+                    <thead>
+                      <tr>
+                        <th>Título da Reunião</th>
+                        <th>Data</th>
+                        <th>Reunião</th>
+                        <th>Lanche</th>
+                        <th>Local</th>
+                        <th class="text-center">Inscritos / Presentes</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end">Ações e Auto Check-in</th>
+                      </tr>
+                    </thead>
+                    <tbody id="eventos-tbody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===============================================================
+               ABA 3: GESTÃO DE INSCRIÇÕES (CRUD)
+               =============================================================== -->
+          <div class="tab-pane fade" id="tab-inscricoes" role="tabpanel" aria-labelledby="tab-btn-inscricoes">
+            <div class="ccb-card">
+              <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h3 class="fs-5"><i class="bi bi-people-fill me-2"></i>Gestão de Participantes Credenciados (INSCRICOES)</h3>
+                <button type="button" id="btn-nova-inscricao-manual" class="btn btn-sm btn-light fw-bold">
+                  <i class="bi bi-person-plus-fill text-primary me-1"></i>Inserir Participante Manualmente
+                </button>
+              </div>
+
+              <!-- Barra de Filtros da Tabela de Inscrições -->
+              <div class="p-3 border-bottom bg-light">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-4">
+                    <label for="ins-filter-evento" class="form-label small mb-1">Filtrar por Reunião:</label>
+                    <select id="ins-filter-evento" class="form-select js-select2">
+                      <option value="ALL">Todas as Reuniões</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label for="ins-filter-cidade" class="form-label small mb-1">Filtrar por Cidade:</label>
+                    <select id="ins-filter-cidade" class="form-select js-select2">
+                      <option value="ALL">Todas as Cidades</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label for="ins-filter-presenca" class="form-label small mb-1">Status de Presença:</label>
+                    <select id="ins-filter-presenca" class="form-select js-select2">
+                      <option value="ALL">Todos</option>
+                      <option value="PRESENTE">Presentes</option>
+                      <option value="PENDENTE">Aguardando</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label for="ins-search-input" class="form-label small mb-1">Buscar Nome, E-mail ou UUID:</label>
+                    <input type="search" id="ins-search-input" class="form-control" placeholder="Digite para filtrar...">
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-3">
+                <div class="table-responsive">
+                  <table class="table ccb-table ccb-table-mobile-cards mb-0">
+                    <thead>
+                      <tr>
+                        <th>Participante</th>
+                        <th>Cidade</th>
+                        <th>Função / Ministério</th>
+                        <th>Reunião</th>
+                        <th>E-mail &amp; Telefone</th>
+                        <th class="text-center">LGPD</th>
+                        <th class="text-center">Presença</th>
+                        <th class="text-end">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody id="inscricoes-tbody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===============================================================
+               ABA 4: TERMINAL DE CHECK-IN (RECEPÇÃO VIA CÂMERA QR CODE)
+               =============================================================== -->
+          <div class="tab-pane fade" id="tab-checkin" role="tabpanel" aria-labelledby="tab-btn-checkin">
+            <div class="row g-4">
+              <!-- Coluna Esquerda: Leitor Óptico de QR Code -->
+              <div class="col-lg-6">
+                <div class="ccb-card h-100">
+                  <div class="ccb-card-header d-flex align-items-center justify-content-between">
+                    <h3 class="fs-5"><i class="bi bi-camera-video-fill me-2"></i>Leitor Óptico QR Code &mdash; Recepção</h3>
+                    <span id="scanner-status-badge" class="badge bg-secondary">Câmera Desligada</span>
+                  </div>
+                  <div class="p-4">
+                    <div class="row g-3 mb-3">
+                      <div class="col-12">
+                        <label for="checkin-select-evento" class="form-label">Reunião Alvo na Recepção:</label>
+                        <select id="checkin-select-evento" class="form-select js-select2">
+                          <option value="ALL">Qualquer Reunião Cadastrada (Reconhecimento Automático)</option>
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <label for="checkin-select-camera" class="form-label">Dispositivo de Câmera:</label>
+                        <select id="checkin-select-camera" class="form-select js-select2">
+                          <option value="environment">Câmera Traseira / Padrão do Dispositivo</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <!-- Viewport da Câmera html5-qrcode -->
+                    <div id="qr-reader-viewport" class="mb-3 d-flex align-items-center justify-content-center text-light">
+                      <div class="text-center p-4">
+                        <i class="bi bi-qr-code-scan display-4 d-block mb-2 text-secondary"></i>
+                        <span class="small text-secondary">Clique em "Iniciar Câmera" para ler o QR Code individual do participante.</span>
+                      </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-center gap-2 mb-4 mobile-stack-buttons">
+                      <button type="button" id="btn-start-scanner" class="btn btn-ccb-primary">
+                        <i class="bi bi-play-circle-fill me-1"></i>Iniciar Câmera
+                      </button>
+                      <button type="button" id="btn-stop-scanner" class="btn btn-ccb-danger d-none">
+                        <i class="bi bi-stop-circle-fill me-1"></i>Parar Câmera
+                      </button>
+                      <button type="button" id="btn-detect-cameras" class="btn btn-ccb-outline btn-sm">
+                        <i class="bi bi-camera me-1"></i>Listar Câmeras
+                      </button>
+                    </div>
+
+                    <!-- Entrada Manual de Contingência por UUID -->
+                    <div class="border-top pt-3">
+                      <label for="checkin-manual-uuid" class="form-label small">
+                        Check-in por Código UUID Manual (Contingência / Leitor USB):
+                      </label>
+                      <div class="input-group">
+                        <input
+                          type="text"
+                          id="checkin-manual-uuid"
+                          class="form-control"
+                          placeholder="Cole ou digite o UUID da credencial..."
+                        >
+                        <button type="button" id="btn-checkin-manual-submit" class="btn btn-ccb-slate">
+                          <i class="bi bi-check2-square me-1"></i>Validar Código
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Coluna Direita: Resultado Instantâneo e Histórico de Leituras -->
+              <div class="col-lg-6">
+                <div class="ccb-card h-100">
+                  <div class="ccb-card-header">
+                    <h3 class="fs-5"><i class="bi bi-person-badge-fill me-2"></i>Painel de Confirmação de Recepção</h3>
+                  </div>
+                  <div class="p-4">
+                    <div id="checkin-last-result" class="checkin-result-banner mb-4 text-center">
+                      <i class="bi bi-upc-scan fs-2 text-secondary d-block mb-1"></i>
+                      <strong class="d-block">Aguardando leitura de credencial...</strong>
+                      <span class="small text-secondary">Posicione o QR Code do participante diante da câmera.</span>
+                    </div>
+
+                    <h4 class="fs-6 mb-2">Últimos Check-ins Registrados nesta Sessão</h4>
+                    <div class="table-responsive">
+                      <table class="table ccb-table table-sm mb-0">
+                        <thead>
+                          <tr>
+                            <th>Horário</th>
+                            <th>Participante</th>
+                            <th>Cidade</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody id="checkin-history-tbody">
+                          <tr>
+                            <td colspan="4" class="text-center text-secondary py-3">Nenhuma leitura realizada nesta sessão.</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- =====================================================================
+       MODAL 1: CRIAR / EDITAR REUNIÃO (EVENTOS)
+       ===================================================================== -->
+  <div class="modal fade" id="modal-evento" tabindex="-1" aria-labelledby="modal-evento-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header ccb-card-header">
+          <h3 class="modal-title fs-5 text-white" id="modal-evento-label">
+            <i class="bi bi-calendar-plus me-2"></i>Cadastrar Reunião / Convocação
+          </h3>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <form id="form-modal-evento" novalidate>
+          <div class="modal-body p-4">
+            <input type="hidden" id="ev-id" value="">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label for="ev-titulo" class="form-label">Título da Reunião / Convocação <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  id="ev-titulo"
+                  class="form-control"
+                  placeholder="Ex: 1ª Reunião Regional da CNS - Campinas/SP"
+                  required
+                  minlength="3"
+                  maxlength="160"
+                >
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o título da reunião.</div>
+              </div>
+              <div class="col-md-4">
+                <label for="ev-status" class="form-label">Status da Convocação <span class="text-danger">*</span></label>
+                <select id="ev-status" class="form-select js-select2" required>
+                  <option value="ATIVO">ATIVO (Aberta no Portal)</option>
+                  <option value="ENCERRADO">ENCERRADO (Fechada)</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label for="ev-data" class="form-label">Data da Reunião <span class="text-danger">*</span></label>
+                <input type="date" id="ev-data" class="form-control" required>
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe uma data válida.</div>
+              </div>
+              <div class="col-md-4">
+                <label for="ev-hora" class="form-label">Horário da Reunião <span class="text-danger">*</span></label>
+                <input type="time" id="ev-hora" class="form-control" required>
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o horário da reunião.</div>
+              </div>
+              <div class="col-md-4">
+                <label for="ev-lanche" class="form-label">Horário do Lanche <span class="text-danger">*</span></label>
+                <input type="time" id="ev-lanche" class="form-control" required>
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o horário do lanche.</div>
+              </div>
+              <div class="col-12">
+                <label for="ev-local" class="form-label">Local / Endereço Completo <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  id="ev-local"
+                  class="form-control"
+                  placeholder="Ex: Casa de Oração Central / Administração Regional Campinas - Rua..."
+                  required
+                  minlength="4"
+                  maxlength="240"
+                >
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o endereço completo do local.</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-ccb-primary">
+              <i class="bi bi-save me-1"></i>Salvar Reunião
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 2: INSERIR PARTICIPANTE MANUALMENTE (INSCRICOES)
+       ===================================================================== -->
+  <div class="modal fade" id="modal-inscricao-manual" tabindex="-1" aria-labelledby="modal-ins-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header ccb-card-header">
+          <h3 class="modal-title fs-5 text-white" id="modal-ins-label">
+            <i class="bi bi-person-plus-fill me-2"></i>Cadastro Manual de Participante
+          </h3>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <form id="form-modal-inscricao" novalidate>
+          <div class="modal-body p-4">
+            <div class="row g-3">
+              <div class="col-12">
+                <label for="man-evento" class="form-label">Reunião / Convocação <span class="text-danger">*</span></label>
+                <select id="man-evento" class="form-select js-select2" required>
+                </select>
+              </div>
+              <div class="col-12">
+                <label for="man-nome" class="form-label">Nome Completo <span class="text-danger">*</span></label>
+                <input type="text" id="man-nome" class="form-control" required minlength="3" maxlength="150">
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o nome completo do participante.</div>
+              </div>
+              <div class="col-md-6">
+                <label for="man-cidade" class="form-label">Cidade (Regional Campinas) <span class="text-danger">*</span></label>
+                <select id="man-cidade" class="form-select js-select2" required>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="man-funcao" class="form-label">Função / Ministério na CNS <span class="text-danger">*</span></label>
+                <select id="man-funcao" class="form-select js-select2" required>
+                </select>
+              </div>
+              <div class="col-md-6" id="wrap-man-email">
+                <label for="man-email" class="form-label">E-mail <span class="text-secondary fw-normal small">(E-mail ou Telefone *)</span></label>
+                <input type="email" id="man-email" class="form-control" placeholder="exemplo@dominio.com.br" maxlength="160">
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe um e-mail válido ou preencha o telefone.</div>
+              </div>
+              <div class="col-md-6" id="wrap-man-telefone">
+                <label for="man-telefone" class="form-label">Telefone / Celular <span class="text-secondary fw-normal small">(E-mail ou Telefone *)</span></label>
+                <input type="tel" id="man-telefone" class="form-control" placeholder="(19) 99999-9999" maxlength="20">
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o telefone com DDD ou preencha o e-mail.</div>
+              </div>
+              <div class="col-md-6">
+                <label for="man-presenca" class="form-label">Situação de Presença Inicial</label>
+                <select id="man-presenca" class="form-select js-select2">
+                  <option value="true">Já Presente no Local (Confirmar Check-in Agora)</option>
+                  <option value="false">Apenas Inscrito (Aguardando Check-in)</option>
+                </select>
+              </div>
+              <div class="col-md-6 d-flex align-items-end">
+                <div class="form-check mb-2">
+                  <input type="checkbox" id="man-lgpd" class="form-check-input" checked required>
+                  <label for="man-lgpd" class="form-check-label small fw-bold">
+                    Termo de Consentimento LGPD colhido <span class="text-danger">*</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-ccb-primary">
+              <i class="bi bi-check2-circle me-1"></i>Registrar Participante
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 3: VISUALIZAR QR CODE INDIVIDUAL DO PARTICIPANTE (PAINEL ADMIN)
+       ===================================================================== -->
+  <div class="modal fade" id="modal-admin-qr" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header ccb-card-header">
+          <h3 class="modal-title fs-6 text-white">
+            <i class="bi bi-qr-code me-2"></i>Credencial QR Code Individual do Participante
+          </h3>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body text-center p-4">
+          <h4 id="admin-qr-nome" class="fs-5 mb-1">—</h4>
+          <p id="admin-qr-detalhes" class="small text-secondary mb-3">—</p>
+          <div id="admin-qr-canvas" class="qr-canvas-box mb-2"></div>
+          <div><code id="admin-qr-uuid" class="small">—</code></div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-ccb-outline btn-sm" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 4: CARTAZ E LINK DE AUTO-CREDENCIAMENTO DO EVENTO (TOTEM / PORTARIA)
+       ===================================================================== -->
+  <div class="modal fade" id="modal-evento-poster" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header ccb-card-header no-print">
+          <h3 class="modal-title fs-5 text-white">
+            <i class="bi bi-qr-code-scan me-2"></i>QR Code e Link Exclusivo de Auto-Credenciamento do Evento
+          </h3>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body p-4 text-center" id="evento-poster-printable">
+          <div class="ccb-report-logos mb-3">
+            <img
+              src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
+              alt="Logotipo CCB"
+            >
+            <span class="ccb-logo-divider"></span>
+            <img
+              src="https://lh3.googleusercontent.com/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP=w400"
+              onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP&sz=w400';"
+              alt="Logotipo CNS"
+            >
+          </div>
+          <span class="badge-ccb-ativo mb-2 d-inline-block">AUTO CHECK-IN ONLINE &bull; CNS CAMPINAS</span>
+          <h3 id="poster-ev-titulo" class="fs-4 mb-1" style="color: var(--ccb-primary);">—</h3>
+          <p id="poster-ev-info" class="small text-secondary mb-3">—</p>
+
+          <div id="poster-qr-canvas" class="qr-canvas-box my-2" style="min-width: 260px; min-height: 260px;"></div>
+
+          <p class="fw-bold mt-2 mb-1" style="color: var(--ccb-primary);">
+            Aponte a câmera do seu celular para confirmar sua presença online
+          </p>
+          <p class="small text-secondary mb-3">
+            Validação automática via Conta Google/Dispositivo ou informando seu E-mail e Telefone de inscrição.
+          </p>
+
+          <div class="text-start bg-light border rounded p-3 no-print">
+            <label for="poster-ev-link" class="form-label small mb-1">
+              <i class="bi bi-link-45deg me-1"></i>Link Exclusivo de Auto-Credenciamento desta Reunião:
+            </label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="poster-ev-link" class="form-control" readonly value="">
+              <button type="button" id="btn-copy-poster-link" class="btn btn-ccb-primary">
+                <i class="bi bi-clipboard me-1"></i>Copiar Link
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light no-print">
+          <button type="button" id="btn-download-poster-qr" class="btn btn-ccb-success btn-sm">
+            <i class="bi bi-download me-1"></i>Baixar QR Code (PNG)
+          </button>
+          <button type="button" id
