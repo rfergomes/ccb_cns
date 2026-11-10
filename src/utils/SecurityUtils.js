@@ -332,4 +332,119 @@ const SecurityUtils = (() => {
       minutesUntilOpen,
       lockMessage: isOpen
         ? 'Credenciamento liberado.'
-        : `O credenciamento de presença (check-in) está bloqueado e será l
+        : `O credenciamento de presença (check-in) está bloqueado e será liberado somente 1 hora antes da reunião (${releaseDateBr} a partir das ${releaseTime}h).`
+    };
+  }
+
+  /**
+   * Normaliza um valor de data (Date ou string) para YYYY-MM-DD.
+   * @param {Date|string} value Valor de data vindo da planilha ou formulário.
+   * @returns {string} Data formatada em YYYY-MM-DD.
+   */
+  function normalizeDateString(value) {
+    if (!value) return '';
+    if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+      return Utilities.formatDate(value, Environment.getTimeZone(), 'yyyy-MM-dd');
+    }
+    const str = String(value).trim();
+    if (DATE_ISO_REGEX.test(str)) {
+      return str;
+    }
+    const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (brMatch) {
+      return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+    }
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      return Utilities.formatDate(parsed, Environment.getTimeZone(), 'yyyy-MM-dd');
+    }
+    return str;
+  }
+
+  /**
+   * Normaliza um valor de hora (Date ou string) para HH:mm.
+   * @param {Date|string} value Valor de hora vindo da planilha ou formulário.
+   * @returns {string} Hora formatada em HH:mm.
+   */
+  function normalizeTimeString(value) {
+    if (!value) return '';
+    if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+      return Utilities.formatDate(value, Environment.getTimeZone(), 'HH:mm');
+    }
+    const str = String(value).trim();
+    if (TIME_HHMM_REGEX.test(str)) {
+      return str;
+    }
+    const matchWithSeconds = str.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+    if (matchWithSeconds) {
+      return `${matchWithSeconds[1].padStart(2, '0')}:${matchWithSeconds[2]}`;
+    }
+    return str;
+  }
+
+  /**
+   * Valida se uma string está no formato YYYY-MM-DD.
+   * @param {string} dateStr String de data.
+   * @returns {boolean}
+   */
+  function isValidDateIso(dateStr) {
+    if (typeof dateStr !== 'string' || !DATE_ISO_REGEX.test(dateStr.trim())) {
+      return false;
+    }
+    const [year, month, day] = dateStr.trim().split('-').map(Number);
+    const dateObj = new Date(Date.UTC(year, month - 1, day));
+    return (
+      dateObj.getUTCFullYear() === year &&
+      dateObj.getUTCMonth() === month - 1 &&
+      dateObj.getUTCDate() === day
+    );
+  }
+
+  /**
+   * Valida se uma string está no formato HH:mm.
+   * @param {string} timeStr String de hora.
+   * @returns {boolean}
+   */
+  function isValidTimeHhMm(timeStr) {
+    return typeof timeStr === 'string' && TIME_HHMM_REGEX.test(timeStr.trim());
+  }
+
+  /**
+   * Converte valores booleanos vindos da planilha ou JSON de forma consistente.
+   * @param {*} value Valor a ser avaliado.
+   * @returns {boolean}
+   */
+  function parseBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      return normalized === 'true' || normalized === 'sim' || normalized === '1' || normalized === 'verdadeiro';
+    }
+    if (typeof value === 'number') {
+      return value === 1;
+    }
+    return false;
+  }
+
+  return Object.freeze({
+    generateUuid,
+    isValidUuid,
+    verifyAdminSecret,
+    assertAdminAuthorized,
+    sanitizeText,
+    sanitizeEmail,
+    extractPhoneDigits,
+    sanitizePhone,
+    matchesPhoneVerification,
+    maskEmailForDisplay,
+    getCurrentIsoTimestamp,
+    getTodayDateString,
+    getCurrentTimeString,
+    evaluateCheckInWindow,
+    normalizeDateString,
+    normalizeTimeString,
+    isValidDateIso,
+    isValidTimeHhMm,
+    parseBoolean
+  });
+})();

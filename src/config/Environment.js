@@ -21,15 +21,15 @@ const Environment = (() => {
   /**
    * Identificadores e URLs públicas dos logotipos institucionais no Google Drive.
    * - Logo CCB: https://drive.google.com/file/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM/view
-   * - Logo CNS: https://drive.google.com/file/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP/view
+   * - Logo CNS: https://drive.google.com/file/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah/view
    */
   const LOGOS = Object.freeze({
     CCB_FILE_ID: '13etuen5crQ5e66EVMRJp4cHrYWRXsREM',
-    CNS_FILE_ID: '18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP',
+    CNS_FILE_ID: '11cfotJKM6DCDD3HUk99kboHWLHG2v0ah',
     CCB_PRIMARY_URL: 'https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400',
     CCB_FALLBACK_URL: 'https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400',
-    CNS_PRIMARY_URL: 'https://lh3.googleusercontent.com/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP=w400',
-    CNS_FALLBACK_URL: 'https://drive.google.com/thumbnail?id=18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP&sz=w400'
+    CNS_PRIMARY_URL: 'https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400',
+    CNS_FALLBACK_URL: 'https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400'
   });
 
   /**
@@ -45,7 +45,8 @@ const Environment = (() => {
         'HORA_EVENTO',
         'HORA_LANCHE',
         'LOCAL',
-        'STATUS'
+        'STATUS',
+        'LINK_MAPA'
       ])
     },
     INSCRICOES: {
@@ -73,6 +74,7 @@ const Environment = (() => {
    */
   const EVENT_STATUS = Object.freeze({
     ATIVO: 'ATIVO',
+    PREVISTO: 'PREVISTO',
     ENCERRADO: 'ENCERRADO'
   });
 

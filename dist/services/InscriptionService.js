@@ -47,7 +47,15 @@ class InscriptionService {
         const cmpDate = a.DATA_EVENTO.localeCompare(b.DATA_EVENTO);
         if (cmpDate !== 0) return cmpDate;
         return (a.HORA_EVENTO || '').localeCompare(b.HORA_EVENTO || '');
-      });
+      })
+      .map((evento) => ({
+        ...evento,
+        CHECKIN_WINDOW: SecurityUtils.evaluateCheckInWindow(
+          evento.DATA_EVENTO,
+          evento.HORA_EVENTO,
+          60
+        )
+      }));
 
     let selectedEvent = activeEvents.length > 0 ? activeEvents[0] : null;
     if (preferredEventoId && SecurityUtils.isValidUuid(preferredEventoId)) {
@@ -199,7 +207,13 @@ class InscriptionService {
       allowClosedEvent: false
     });
 
-    const autoCheckInNow = SecurityUtils.parseBoolean(payload.AUTO_CHECKIN_NOW);
+    const windowStatus = SecurityUtils.evaluateCheckInWindow(
+      evento.DATA_EVENTO,
+      evento.HORA_EVENTO,
+      60
+    );
+    const autoCheckInNow =
+      SecurityUtils.parseBoolean(payload.AUTO_CHECKIN_NOW) && windowStatus.isOpen;
     if (autoCheckInNow) {
       normalized.PRESENCA_CONFIRMADA = true;
       normalized.DATA_HORA_PRESENCA = SecurityUtils.getCurrentIsoTimestamp();
@@ -355,6 +369,15 @@ class InscriptionService {
     const today = SecurityUtils.getTodayDateString();
     if (evento.STATUS !== Environment.EVENT_STATUS.ATIVO || evento.DATA_EVENTO < today) {
       throw new Error('O credenciamento online para esta reunião encontra-se encerrado.');
+    }
+
+    const windowStatus = SecurityUtils.evaluateCheckInWindow(
+      evento.DATA_EVENTO,
+      evento.HORA_EVENTO,
+      60
+    );
+    if (!windowStatus.isOpen) {
+      throw new Error(windowStatus.lockMessage);
     }
 
     const inscricoesEvento = this.repository_.findInscricoesByEventoId(evento.ID_EVENTO);

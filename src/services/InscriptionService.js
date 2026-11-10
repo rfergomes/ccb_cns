@@ -20,18 +20,22 @@ class InscriptionService {
    * Verifica se há evento com status ATIVO e cuja data seja igual ou posterior ao dia de hoje.
    * Se `preferredEventoId` for informado na URL (ex: link exclusivo do QR Code do evento),
    * seleciona prioritariamente esse evento caso esteja ativo.
+   * Se `credentialUuid` for informado na URL (?view=portal&credencial=UUID), carrega o comprovante
+   * individual com QR Code para exibição direta (ex: link aberto pelo WhatsApp do participante).
    * Também verifica se há uma Conta Google logada na sessão que já possua inscrição no evento ativo.
    *
    * @param {string} [preferredEventoId] UUID opcional do evento vindo da URL (?view=checkin&evento=UUID).
+   * @param {string} [credentialUuid] UUID opcional da inscrição vindo da URL (?view=portal&credencial=UUID).
    * @returns {{
    *   hasActiveEvent: boolean,
    *   activeEvent: Object|null,
    *   activeEvents: Array<Object>,
    *   googleSessionMatch: Object|null,
+   *   initialVoucher: Object|null,
    *   metadata: Object
    * }}
    */
-  getPortalState(preferredEventoId = '') {
+  getPortalState(preferredEventoId = '', credentialUuid = '') {
     this.repository_.ensureDatabaseSchema();
 
     const today = SecurityUtils.getTodayDateString();
@@ -66,6 +70,11 @@ class InscriptionService {
       }
     }
 
+    let initialVoucher = null;
+    if (credentialUuid && SecurityUtils.isValidUuid(credentialUuid)) {
+      initialVoucher = this.getVoucherById(credentialUuid);
+    }
+
     const metadata = Environment.getPublicMetadata();
     let googleSessionMatch = null;
 
@@ -95,7 +104,46 @@ class InscriptionService {
       activeEvent: selectedEvent,
       activeEvents,
       googleSessionMatch,
+      initialVoucher,
       metadata
+    };
+  }
+
+  /**
+   * Recupera os dados do comprovante e QR Code de uma inscrição pelo seu UUID.
+   *
+   * @param {string} idInscricao UUID da inscrição.
+   * @returns {Object|null} Dados do comprovante para renderização do QR Code ou null se não encontrado.
+   */
+  getVoucherById(idInscricao) {
+    this.repository_.ensureDatabaseSchema();
+    const cleanId = String(idInscricao || '').trim();
+    if (!SecurityUtils.isValidUuid(cleanId)) {
+      return null;
+    }
+    const inscricao = this.repository_.findInscricaoById(cleanId);
+    if (!inscricao) {
+      return null;
+    }
+    const rawEvento = this.repository_.findEventoById(inscricao.ID_EVENTO);
+    const evento = rawEvento
+      ? {
+          ...rawEvento,
+          CHECKIN_WINDOW: SecurityUtils.evaluateCheckInWindow(
+            rawEvento.DATA_EVENTO,
+            rawEvento.HORA_EVENTO,
+            60
+          )
+        }
+      : null;
+
+    return {
+      success: true,
+      isDuplicate: false,
+      message: 'Comprovante individual e QR Code carregados com sucesso.',
+      inscricao,
+      evento,
+      qrPayload: inscricao.ID_INSCRICAO
     };
   }
 
@@ -495,4 +543,24 @@ class InscriptionService {
         success: true,
         alreadyCheckedIn: true,
         message: `Sua presença já está confirmada nesta reunião desde ${matchedInscricao.DATA_HORA_PRESENCA}.`,
-      
+        inscricao: matchedInscricao,
+        evento,
+        qrPayload: matchedInscricao.ID_INSCRICAO
+      };
+    }
+
+    const updated = this.repository_.updateInscricaoById(matchedInscricao.ID_INSCRICAO, {
+      PRESENCA_CONFIRMADA: true,
+      DATA_HORA_PRESENCA: SecurityUtils.getCurrentIsoTimestamp()
+    });
+
+    return {
+      success: true,
+      alreadyCheckedIn: false,
+      message: `A Paz de Deus, ${updated.NOME_COMPLETO}! Sua presença foi confirmada com sucesso no evento.`,
+      inscricao: updated,
+      evento,
+      qrPayload: updated.ID_INSCRICAO
+    };
+  }
+}

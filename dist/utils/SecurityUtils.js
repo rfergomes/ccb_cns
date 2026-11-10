@@ -244,6 +244,99 @@ const SecurityUtils = (() => {
   }
 
   /**
+   * Retorna o horário corrente no fuso horário da aplicação no formato HH:mm.
+   * @returns {string} Hora atual (HH:mm).
+   */
+  function getCurrentTimeString() {
+    const tz = Environment.getTimeZone();
+    return Utilities.formatDate(new Date(), tz, 'HH:mm');
+  }
+
+  /**
+   * Avalia a janela de liberação do check-in (credenciamento de presença).
+   * Por padrão, o check-in é liberado somente a partir de 1 hora (60 minutos)
+   * antes da data/hora de início programada para a reunião.
+   *
+   * @param {string} dataEvento Data do evento em YYYY-MM-DD.
+   * @param {string} horaEvento Hora de início da reunião em HH:mm.
+   * @param {number} [advanceMinutes=60] Minutos de antecedência para liberar o check-in (padrão: 60).
+   * @returns {{
+   *   isOpen: boolean,
+   *   advanceMinutes: number,
+   *   eventDateIso: string,
+   *   eventDateBr: string,
+   *   eventTime: string,
+   *   releaseDateIso: string,
+   *   releaseDateBr: string,
+   *   releaseTime: string,
+   *   minutesUntilOpen: number,
+   *   lockMessage: string
+   * }}
+   */
+  function evaluateCheckInWindow(dataEvento, horaEvento, advanceMinutes = 60) {
+    const cleanDate = normalizeDateString(dataEvento);
+    const cleanTime = isValidTimeHhMm(normalizeTimeString(horaEvento))
+      ? normalizeTimeString(horaEvento)
+      : '00:00';
+
+    if (!isValidDateIso(cleanDate)) {
+      return {
+        isOpen: false,
+        advanceMinutes,
+        eventDateIso: cleanDate || '',
+        eventDateBr: '—',
+        eventTime: cleanTime,
+        releaseDateIso: '',
+        releaseDateBr: '—',
+        releaseTime: '—',
+        minutesUntilOpen: 0,
+        lockMessage: 'Data ou horário da reunião inválidos para liberação de check-in.'
+      };
+    }
+
+    const [evY, evM, evD] = cleanDate.split('-').map(Number);
+    const [evH, evMin] = cleanTime.split(':').map(Number);
+    const eventWallMs = Date.UTC(evY, evM - 1, evD, evH, evMin, 0);
+    const releaseWallMs = eventWallMs - advanceMinutes * 60 * 1000;
+
+    const nowDateStr = getTodayDateString();
+    const nowTimeStr = getCurrentTimeString();
+    const [nowY, nowM, nowD] = nowDateStr.split('-').map(Number);
+    const [nowH, nowMin] = nowTimeStr.split(':').map(Number);
+    const nowWallMs = Date.UTC(nowY, nowM - 1, nowD, nowH, nowMin, 0);
+
+    const releaseObj = new Date(releaseWallMs);
+    const relY = String(releaseObj.getUTCFullYear());
+    const relM = String(releaseObj.getUTCMonth() + 1).padStart(2, '0');
+    const relD = String(releaseObj.getUTCDate()).padStart(2, '0');
+    const relH = String(releaseObj.getUTCHours()).padStart(2, '0');
+    const relMin = String(releaseObj.getUTCMinutes()).padStart(2, '0');
+
+    const releaseDateIso = `${relY}-${relM}-${relD}`;
+    const releaseDateBr = `${relD}/${relM}/${relY}`;
+    const releaseTime = `${relH}:${relMin}`;
+    const eventDateBr = `${String(evD).padStart(2, '0')}/${String(evM).padStart(2, '0')}/${evY}`;
+
+    const isOpen = nowWallMs >= releaseWallMs;
+    const minutesUntilOpen = isOpen ? 0 : Math.ceil((releaseWallMs - nowWallMs) / 60000);
+
+    return {
+      isOpen,
+      advanceMinutes,
+      eventDateIso: cleanDate,
+      eventDateBr,
+      eventTime: cleanTime,
+      releaseDateIso,
+      releaseDateBr,
+      releaseTime,
+      minutesUntilOpen,
+      lockMessage: isOpen
+        ? 'Credenciamento liberado.'
+        : `O credenciamento de presença (check-in) está bloqueado e será liberado somente 1 hora antes da reunião (${releaseDateBr} a partir das ${releaseTime}h).`
+    };
+  }
+
+  /**
    * Normaliza um valor de data (Date ou string) para YYYY-MM-DD.
    * @param {Date|string} value Valor de data vindo da planilha ou formulário.
    * @returns {string} Data formatada em YYYY-MM-DD.
@@ -346,6 +439,8 @@ const SecurityUtils = (() => {
     maskEmailForDisplay,
     getCurrentIsoTimestamp,
     getTodayDateString,
+    getCurrentTimeString,
+    evaluateCheckInWindow,
     normalizeDateString,
     normalizeTimeString,
     isValidDateIso,

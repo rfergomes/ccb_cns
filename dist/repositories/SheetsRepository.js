@@ -137,7 +137,8 @@ class SheetsRepository {
       HORA_EVENTO: SecurityUtils.normalizeTimeString(row[3]),
       HORA_LANCHE: SecurityUtils.normalizeTimeString(row[4]),
       LOCAL: String(row[5] || '').trim(),
-      STATUS: String(row[6] || Environment.EVENT_STATUS.ENCERRADO).trim().toUpperCase()
+      STATUS: String(row[6] || Environment.EVENT_STATUS.ENCERRADO).trim().toUpperCase(),
+      LINK_MAPA: String(row[7] || '').trim()
     };
   }
 
@@ -155,7 +156,8 @@ class SheetsRepository {
       String(evento.HORA_EVENTO).trim(),
       String(evento.HORA_LANCHE).trim(),
       String(evento.LOCAL).trim(),
-      String(evento.STATUS).trim().toUpperCase()
+      String(evento.STATUS).trim().toUpperCase(),
+      String(evento.LINK_MAPA || '').trim()
     ];
   }
 
@@ -264,7 +266,8 @@ class SheetsRepository {
         HORA_EVENTO: eventoData.HORA_EVENTO,
         HORA_LANCHE: eventoData.HORA_LANCHE,
         LOCAL: eventoData.LOCAL,
-        STATUS: eventoData.STATUS || Environment.EVENT_STATUS.ATIVO
+        STATUS: eventoData.STATUS || Environment.EVENT_STATUS.ATIVO,
+        LINK_MAPA: String(eventoData.LINK_MAPA || '').trim()
       };
 
       const rowValues = this.mapEventoToRow_(novoEvento);
@@ -314,7 +317,8 @@ class SheetsRepository {
             HORA_EVENTO: updates.HORA_EVENTO !== undefined ? updates.HORA_EVENTO : currentEvento.HORA_EVENTO,
             HORA_LANCHE: updates.HORA_LANCHE !== undefined ? updates.HORA_LANCHE : currentEvento.HORA_LANCHE,
             LOCAL: updates.LOCAL !== undefined ? updates.LOCAL : currentEvento.LOCAL,
-            STATUS: updates.STATUS !== undefined ? updates.STATUS : currentEvento.STATUS
+            STATUS: updates.STATUS !== undefined ? updates.STATUS : currentEvento.STATUS,
+            LINK_MAPA: updates.LINK_MAPA !== undefined ? updates.LINK_MAPA : currentEvento.LINK_MAPA
           };
 
           const rowNumber = i + 2;

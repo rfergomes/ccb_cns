@@ -213,15 +213,28 @@ class AdminService {
       throw new Error('O local/endereço da reunião é obrigatório.');
     }
 
+    const rawLinkMapa = String(eventPayload.LINK_MAPA || eventPayload.linkMapa || '').trim();
+    let linkMapa = '';
+    if (rawLinkMapa) {
+      if (!/^https?:\/\/\S+$/i.test(rawLinkMapa)) {
+        throw new Error(
+          'O Link de Localização (Google Maps / Waze) deve iniciar com http:// ou https://.'
+        );
+      }
+      linkMapa = SecurityUtils.sanitizeText(rawLinkMapa, 500);
+    }
+
     const rawStatus = String(
       eventPayload.STATUS || eventPayload.status || Environment.EVENT_STATUS.ATIVO
     )
       .trim()
       .toUpperCase();
-    const status =
-      rawStatus === Environment.EVENT_STATUS.ENCERRADO
-        ? Environment.EVENT_STATUS.ENCERRADO
-        : Environment.EVENT_STATUS.ATIVO;
+    let status = Environment.EVENT_STATUS.ATIVO;
+    if (rawStatus === Environment.EVENT_STATUS.ENCERRADO) {
+      status = Environment.EVENT_STATUS.ENCERRADO;
+    } else if (rawStatus === Environment.EVENT_STATUS.PREVISTO) {
+      status = Environment.EVENT_STATUS.PREVISTO;
+    }
 
     return {
       TITULO: titulo,
@@ -229,15 +242,47 @@ class AdminService {
       HORA_EVENTO: horaEvento,
       HORA_LANCHE: horaLanche,
       LOCAL: local,
-      STATUS: status
+      STATUS: status,
+      LINK_MAPA: linkMapa
     };
   }
 
   /**
+   * Garante que apenas um evento permaneça com status ATIVO por vez.
+   * Ao ativar um evento, todos os demais eventos que estavam ATIVOS são
+   * automaticamente alterados para ENCERRADO.
+   *
+   * @param {string} [excludeEventoId=''] UUID do evento que permanecerá ATIVO.
+   * @returns {Array<string>} Títulos dos eventos anteriores que foram encerrados.
+   * @private
+   */
+  closeOtherActiveEventos_(excludeEventoId = '') {
+    const cleanExclude = String(excludeEventoId || '').trim().toLowerCase();
+    const allEventos = this.repository_.findAllEventos();
+    const closedTitles = [];
+
+    allEventos.forEach((ev) => {
+      if (
+        ev.STATUS === Environment.EVENT_STATUS.ATIVO &&
+        (!cleanExclude || ev.ID_EVENTO.toLowerCase() !== cleanExclude)
+      ) {
+        this.repository_.updateEventoById(ev.ID_EVENTO, {
+          STATUS: Environment.EVENT_STATUS.ENCERRADO
+        });
+        closedTitles.push(ev.TITULO);
+      }
+    });
+
+    return closedTitles;
+  }
+
+  /**
    * Cria ou atualiza um evento na tabela EVENTOS.
+   * Se o status for ATIVO, encerra automaticamente qualquer outro evento que estivesse ATIVO.
+   *
    * @param {string} adminSecret Chave administrativa.
    * @param {Object} eventPayload Dados do evento (se incluir ID_EVENTO válido, atualiza).
-   * @returns {{success: boolean, message: string, evento: Object}}
+   * @returns {{success: boolean, message: string, evento: Object, autoClosedEvents: Array<string>}}
    */
   saveEvento(adminSecret, eventPayload) {
     SecurityUtils.assertAdminAuthorized(adminSecret);
@@ -245,30 +290,49 @@ class AdminService {
 
     const normalized = this.validateEventoPayload_(eventPayload);
     const idEvento = String(eventPayload.ID_EVENTO || eventPayload.idEvento || '').trim();
+    let autoClosedEvents = [];
 
     if (idEvento && SecurityUtils.isValidUuid(idEvento)) {
+      if (normalized.STATUS === Environment.EVENT_STATUS.ATIVO) {
+        autoClosedEvents = this.closeOtherActiveEventos_(idEvento);
+      }
       const updated = this.repository_.updateEventoById(idEvento, normalized);
+      const extraMsg =
+        autoClosedEvents.length > 0
+          ? ` O evento ativo anterior ("${autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
+          : '';
       return {
         success: true,
-        message: 'Reunião atualizada com sucesso!',
-        evento: updated
+        message: `Reunião atualizada com sucesso!${extraMsg}`,
+        evento: updated,
+        autoClosedEvents
       };
     }
 
+    if (normalized.STATUS === Environment.EVENT_STATUS.ATIVO) {
+      autoClosedEvents = this.closeOtherActiveEventos_('');
+    }
     const created = this.repository_.insertEvento(normalized);
+    const extraMsg =
+      autoClosedEvents.length > 0
+        ? ` O evento ativo anterior ("${autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
+        : '';
     return {
       success: true,
-      message: 'Nova convocação / reunião cadastrada com sucesso!',
-      evento: created
+      message: `Nova convocação / reunião cadastrada com sucesso!${extraMsg}`,
+      evento: created,
+      autoClosedEvents
     };
   }
 
   /**
-   * Alterna rapidamente o status de um evento entre ATIVO e ENCERRADO.
+   * Altera rapidamente o status de um evento entre ATIVO, PREVISTO e ENCERRADO.
+   * Ao definir como ATIVO, encerra automaticamente qualquer outro evento ativo.
+   *
    * @param {string} adminSecret Chave administrativa.
    * @param {string} idEvento UUID do evento.
-   * @param {string} novoStatus Novo status ('ATIVO' | 'ENCERRADO').
-   * @returns {{success: boolean, message: string, evento: Object}}
+   * @param {string} novoStatus Novo status ('ATIVO' | 'PREVISTO' | 'ENCERRADO').
+   * @returns {{success: boolean, message: string, evento: Object, autoClosedEvents: Array<string>}}
    */
   updateEventoStatus(adminSecret, idEvento, novoStatus) {
     SecurityUtils.assertAdminAuthorized(adminSecret);
@@ -279,16 +343,27 @@ class AdminService {
     const statusUpper = String(novoStatus || '').trim().toUpperCase();
     if (
       statusUpper !== Environment.EVENT_STATUS.ATIVO &&
+      statusUpper !== Environment.EVENT_STATUS.PREVISTO &&
       statusUpper !== Environment.EVENT_STATUS.ENCERRADO
     ) {
-      throw new Error('Status inválido. Utilize ATIVO ou ENCERRADO.');
+      throw new Error('Status inválido. Utilize ATIVO, PREVISTO ou ENCERRADO.');
+    }
+
+    let autoClosedEvents = [];
+    if (statusUpper === Environment.EVENT_STATUS.ATIVO) {
+      autoClosedEvents = this.closeOtherActiveEventos_(idEvento);
     }
 
     const updated = this.repository_.updateEventoById(idEvento, { STATUS: statusUpper });
+    const extraMsg =
+      autoClosedEvents.length > 0
+        ? ` O evento ativo anterior ("${autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
+        : '';
     return {
       success: true,
-      message: `Status da reunião alterado para ${statusUpper}.`,
-      evento: updated
+      message: `Status da reunião alterado para ${statusUpper}.${extraMsg}`,
+      evento: updated,
+      autoClosedEvents
     };
   }
 
@@ -485,4 +560,19 @@ class AdminService {
       };
     }
 
-  
+    const nowIso = SecurityUtils.getCurrentIsoTimestamp();
+    const updated = this.repository_.updateInscricaoById(inscricao.ID_INSCRICAO, {
+      PRESENCA_CONFIRMADA: true,
+      DATA_HORA_PRESENCA: nowIso
+    });
+
+    return {
+      success: true,
+      alreadyCheckedIn: false,
+      message: `Check-in confirmado com sucesso para ${updated.NOME_COMPLETO} (${updated.CIDADE})!`,
+      inscricao: updated,
+      evento
+    };
+  }
+}
+

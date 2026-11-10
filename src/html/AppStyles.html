@@ -281,6 +281,26 @@
     color: var(--ccb-white);
   }
 
+  /* Botão de Exportar PNG no Cabeçalho dos Cards */
+  .btn-ccb-header-export {
+    background-color: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    color: var(--ccb-white);
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.25rem 0.65rem;
+    border-radius: 5px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .btn-ccb-header-export:hover,
+  .btn-ccb-header-export:focus-visible {
+    background-color: var(--ccb-white);
+    border-color: var(--ccb-white);
+    color: var(--ccb-primary);
+  }
+
   /* Controles de Formulário */
   .form-label {
     font-weight: 700;
@@ -599,7 +619,8 @@
     font-size: 0.76rem;
   }
 
-  .badge-ccb-pendente {
+  .badge-ccb-pendente,
+  .badge-ccb-previsto {
     background-color: var(--ccb-yellow);
     color: var(--ccb-text);
     font-weight: 700;
@@ -881,15 +902,23 @@
 
   /* Regras de Impressão (Comprovante QR Code, Cartaz QR Code do Evento e Relatório PDF) */
   @media print {
+    html,
     body {
+      height: auto !important;
+      min-height: 0 !important;
+      display: block !important;
+      overflow: visible !important;
       background-color: #FFFFFF !important;
       color: #000000 !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
 
     .no-print,
     .ccb-navbar,
     .ccb-nav-tabs,
-    .ccb-footer {
+    .ccb-footer,
+    .modal-backdrop {
       display: none !important;
     }
 
@@ -899,6 +928,7 @@
       box-shadow: none !important;
       border: 1px solid #000000 !important;
       break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .print-only-header {
@@ -908,6 +938,49 @@
       border-bottom: 2px solid #033D60;
       margin-bottom: 1.25rem;
       padding-bottom: 0.75rem;
+    }
+
+    /* Quando um modal (ex.: Cartaz QR Code do Evento) está aberto na hora de imprimir,
+       oculta totalmente o painel de fundo (<main>) e imprime somente o Cartaz em 1 página */
+    body.modal-open main,
+    body.print-poster-mode main,
+    body.modal-open #main-app-container,
+    body.print-poster-mode #main-app-container,
+    body.modal-open .print-only-header,
+    body.print-poster-mode .print-only-header,
+    body.modal-open .modal:not(.show) {
+      display: none !important;
+    }
+
+    body.modal-open .modal.show,
+    body.print-poster-mode #modal-evento-poster {
+      position: static !important;
+      display: block !important;
+      overflow: visible !important;
+      background-color: #FFFFFF !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      inset: auto !important;
+      height: auto !important;
+    }
+
+    body.modal-open .modal.show .modal-dialog,
+    body.print-poster-mode #modal-evento-poster .modal-dialog {
+      max-width: 600px !important;
+      width: 100% !important;
+      margin: 0.5rem auto !important;
+      transform: none !important;
+      min-height: 0 !important;
+    }
+
+    body.modal-open .modal.show .modal-content,
+    body.print-poster-mode #modal-evento-poster .modal-content {
+      border: 2px solid #033D60 !important;
+      border-radius: 10px !important;
+      box-shadow: none !important;
+      background-color: #FFFFFF !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
     }
   }
 </style>

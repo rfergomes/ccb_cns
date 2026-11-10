@@ -262,7 +262,7 @@ function runTests() {
   const bootVazio = JSON.parse(resPortalVazio.template.bootstrapJson);
   assert.strictEqual(bootVazio.hasActiveEvent, false);
   assert.strictEqual(bootVazio.metadata.logos.CCB_FILE_ID, '13etuen5crQ5e66EVMRJp4cHrYWRXsREM');
-  assert.strictEqual(bootVazio.metadata.logos.CNS_FILE_ID, '18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP');
+  assert.strictEqual(bootVazio.metadata.logos.CNS_FILE_ID, '11cfotJKM6DCDD3HUk99kboHWLHG2v0ah');
   console.log('✓ [1/9] doGet() padrão roteia para view=portal e expõe Logotipos CCB e CNS.');
 
   // Teste 2: Roteamento doGet para view=admin e view=checkin
@@ -295,7 +295,46 @@ function runTests() {
   assert.strictEqual(createEvRes.success, true);
   const idEventoCriado = createEvRes.evento.ID_EVENTO;
   assert.ok(idEventoCriado && idEventoCriado.length === 36);
-  console.log(`✓ [4/9] Evento criado com UUID v4 persistente (${idEventoCriado}).`);
+
+  // Testa criação de evento futuro com status PREVISTO (não afeta o evento ATIVO)
+  const evPrevistoRes = gasGlobalContext.apiAdminSaveEvento(
+    mockPropertiesStore.ADMIN_SECRET,
+    {
+      TITULO: '2ª Reunião Geral CNS - Programada',
+      DATA_EVENTO: '2027-09-20',
+      HORA_EVENTO: '14:00',
+      HORA_LANCHE: '15:20',
+      LOCAL: 'Rua Germânia, 661 - Campinas/SP',
+      STATUS: 'PREVISTO'
+    },
+    'ALL'
+  );
+  assert.strictEqual(evPrevistoRes.evento.STATUS, 'PREVISTO');
+
+  // Testa ativação do 2º evento: encerra automaticamente o 1º evento ativo
+  const activateSecondRes = gasGlobalContext.apiAdminUpdateEventoStatus(
+    mockPropertiesStore.ADMIN_SECRET,
+    evPrevistoRes.evento.ID_EVENTO,
+    'ATIVO',
+    'ALL'
+  );
+  assert.strictEqual(activateSecondRes.evento.STATUS, 'ATIVO');
+  assert.strictEqual(activateSecondRes.autoClosedEvents.length, 1);
+
+  // Reativa o 1º evento (e deixa o 2º como PREVISTO) para os testes seguintes
+  gasGlobalContext.apiAdminUpdateEventoStatus(
+    mockPropertiesStore.ADMIN_SECRET,
+    evPrevistoRes.evento.ID_EVENTO,
+    'PREVISTO',
+    'ALL'
+  );
+  gasGlobalContext.apiAdminUpdateEventoStatus(
+    mockPropertiesStore.ADMIN_SECRET,
+    idEventoCriado,
+    'ATIVO',
+    'ALL'
+  );
+  console.log(`✓ [4/9] Evento único ATIVO e status PREVISTO validados (${idEventoCriado}).`);
 
   // Teste 5: Validação condicional (E-mail OU Telefone: pelo menos um obrigatório) e LGPD
   assert.throws(() => {
@@ -430,4 +469,36 @@ function runTests() {
 
   const selfCheckinOnlyEmail = gasGlobalContext.apiSubmitOnlineSelfCheckIn({
     ID_EVENTO: idEventoCriado,
-    METHOD: 'EMAIL_PHON
+    METHOD: 'EMAIL_PHONE',
+    EMAIL: 'carlos.souza@exemplo.org.br',
+    TELEFONE: '' // Informou apenas o e-mail
+  });
+  assert.strictEqual(selfCheckinOnlyEmail.success, true);
+  assert.strictEqual(selfCheckinOnlyEmail.alreadyCheckedIn, true);
+  console.log('✓ [7/9] Auto-Credenciamento Online validado com APENAS E-mail ou APENAS Telefone.');
+
+  // Teste 8: Check-in via QR Code na Recepção detecta presença já confirmada
+  const checkinRecepcao = gasGlobalContext.apiAdminProcessQrCheckIn(
+    mockPropertiesStore.ADMIN_SECRET,
+    inscricaoRes1.inscricao.ID_INSCRICAO,
+    idEventoCriado,
+    'ALL'
+  );
+  assert.strictEqual(checkinRecepcao.success, true);
+  assert.strictEqual(checkinRecepcao.alreadyCheckedIn, true);
+  console.log('✓ [8/9] Terminal de Recepção integra-se em tempo real com os check-ins feitos online.');
+
+  // Teste 9: Cálculo de KPIs e séries de gráficos no Dashboard Administrativo
+  const dashBundle = gasGlobalContext.apiAdminGetDashboardData(
+    mockPropertiesStore.ADMIN_SECRET,
+    idEventoCriado
+  );
+  assert.strictEqual(dashBundle.kpis.totalInscricoes, 2);
+  assert.strictEqual(dashBundle.kpis.totalPresencas, 2);
+  assert.strictEqual(dashBundle.kpis.taxaPresenca, 100);
+  console.log('✓ [9/9] KPIs e agregações de gráficos atualizados com 100% de precisão.\n');
+
+  console.log('Todos os 9 cenários de teste automatizados passaram com sucesso!');
+}
+
+runTests();

@@ -619,6 +619,90 @@
     }
 
     /**
+     * Avalia no cliente se a janela de check-in (1 hora antes do início do evento)
+     * já está liberada, mantendo sincronia com a regra do backend.
+     * @param {Object} ev Objeto de evento.
+     * @returns {{isOpen: boolean, releaseDateBr: string, releaseTime: string, lockMessage: string}}
+     */
+    function evaluateEventCheckInWindowClient(ev) {
+      if (!ev || !ev.DATA_EVENTO) {
+        return {
+          isOpen: false,
+          releaseDateBr: '—',
+          releaseTime: '—',
+          lockMessage: 'Nenhuma reunião selecionada.'
+        };
+      }
+
+      const mDate = String(ev.DATA_EVENTO).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const mTime = String(ev.HORA_EVENTO || '00:00').trim().match(/^(\d{2}):(\d{2})$/);
+      if (!mDate) {
+        return ev.CHECKIN_WINDOW || {
+          isOpen: false,
+          releaseDateBr: '—',
+          releaseTime: '—',
+          lockMessage: 'Data da reunião inválida.'
+        };
+      }
+
+      const evY = Number(mDate[1]);
+      const evM = Number(mDate[2]);
+      const evD = Number(mDate[3]);
+      const evH = mTime ? Number(mTime[1]) : 0;
+      const evMin = mTime ? Number(mTime[2]) : 0;
+
+      const eventWallMs = Date.UTC(evY, evM - 1, evD, evH, evMin, 0);
+      const releaseWallMs = eventWallMs - 60 * 60 * 1000;
+
+      const now = new Date();
+      const nowWallMs = Date.UTC(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        now.getHours(),
+        now.getMinutes(),
+        0
+      );
+
+      const relObj = new Date(releaseWallMs);
+      const relD = String(relObj.getUTCDate()).padStart(2, '0');
+      const relM = String(relObj.getUTCMonth() + 1).padStart(2, '0');
+      const relY = String(relObj.getUTCFullYear());
+      const relH = String(relObj.getUTCHours()).padStart(2, '0');
+      const relMin = String(relObj.getUTCMinutes()).padStart(2, '0');
+
+      const releaseDateBr = `${relD}/${relM}/${relY}`;
+      const releaseTime = `${relH}:${relMin}`;
+      const isOpen = nowWallMs >= releaseWallMs;
+
+      return {
+        isOpen,
+        releaseDateBr,
+        releaseTime,
+        lockMessage: isOpen
+          ? 'Credenciamento liberado.'
+          : `O credenciamento de presença (check-in) está bloqueado e será liberado somente 1 hora antes da reunião (${releaseDateBr} a partir das ${releaseTime}h).`
+      };
+    }
+
+    /**
+     * Resolve o link de localização (Google Maps / Waze) do evento:
+     * utiliza o LINK_MAPA cadastrado pelo administrador ou gera automaticamente
+     * a URL de busca do Google Maps a partir do endereço (LOCAL).
+     * @param {Object} ev Objeto de evento.
+     * @returns {string} URL de localização.
+     */
+    function resolveEventMapUrl(ev) {
+      if (!ev) return 'https://www.google.com/maps';
+      const customLink = String(ev.LINK_MAPA || '').trim();
+      if (/^https?:\/\/\S+$/i.test(customLink)) {
+        return customLink;
+      }
+      const query = String(ev.LOCAL || 'Campinas SP').trim();
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    }
+
+    /**
      * Preenche os dados da convocação oficial na tela pública.
      * @param {Object} ev Objeto de evento ativo.
      */
@@ -630,6 +714,24 @@
       document.getElementById('portal-ev-hora').textContent = ev.HORA_EVENTO ? `${ev.HORA_EVENTO}h` : '—';
       document.getElementById('portal-ev-lanche').textContent = ev.HORA_LANCHE ? `${ev.HORA_LANCHE}h` : '—';
       document.getElementById('portal-ev-local').textContent = ev.LOCAL || '—';
+
+      const mapLinkEl = document.getElementById('portal-ev-map-link');
+      if (mapLinkEl) {
+        mapLinkEl.href = resolveEventMapUrl(ev);
+      }
+
+      const noteEl = document.getElementById('portal-checkin-window-note');
+      if (noteEl) {
+        const win = evaluateEventCheckInWindowClient(ev);
+        if (win.isOpen) {
+          noteEl.innerHTML =
+            '<span class="text-success fw-bold"><i class="bi bi-check2-circle me-1"></i>Check-in de presença liberado para esta reunião!</span>';
+        } else {
+          noteEl.innerHTML = `<i class="bi bi-clock-history me-1"></i>Liberação do Check-in de Presença: <strong>${escapeHtml(
+            win.releaseDateBr
+          )} às ${escapeHtml(win.releaseTime)}h</strong> (1h antes da reunião).`;
+        }
+      }
     }
 
     /**
@@ -695,8 +797,8 @@
               <li><strong>Nome:</strong> ${escapeHtml(payload.NOME_COMPLETO)}</li>
               <li><strong>Cidade:</strong> ${escapeHtml(payload.CIDADE)}</li>
               <li><strong>Função:</strong> ${escapeHtml(payload.FUNCAO)}</li>
-              <li><strong>E-mail:</strong> ${escapeHtml(payload.EMAIL)}</li>
-              <li><strong>Telefone:</strong> ${escapeHtml(payload.TELEFONE)}</li>
+              <li><strong>E-mail:</strong> ${escapeHtml(payload.EMAIL || 'Não informado')}</li>
+              <li><strong>Telefone:</strong> ${escapeHtml(payload.TELEFONE || 'Não informado')}</li>
             </ul>
           </div>
         `,
@@ -713,6 +815,7 @@
       try {
         setLoading(true, 'Registrando inscrição e gerando credencial QR Code...');
         const response = await callServerRpc('apiSubmitPublicInscription', payload);
+        setLoading(false);
 
         if (response.inscricao && response.evento) {
           saveDeviceCredential(response.evento.ID_EVENTO, response.inscricao.ID_INSCRICAO);
@@ -730,6 +833,7 @@
           confirmButtonColor: '#033D60'
         });
       } catch (err) {
+        setLoading(false);
         toastr.error(err.message);
         Swal.fire({
           title: 'Não foi possível concluir',
@@ -737,8 +841,6 @@
           icon: 'error',
           confirmButtonColor: '#DC3C00'
         });
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -761,6 +863,10 @@
       document.getElementById('voucher-evento-hora').textContent = evento && evento.HORA_EVENTO ? `${evento.HORA_EVENTO}h` : '—';
       document.getElementById('voucher-evento-lanche').textContent = evento && evento.HORA_LANCHE ? `${evento.HORA_LANCHE}h` : '—';
       document.getElementById('voucher-evento-local').textContent = evento ? evento.LOCAL : '—';
+      const voucherMapLink = document.getElementById('voucher-evento-map-link');
+      if (voucherMapLink) {
+        voucherMapLink.href = resolveEventMapUrl(evento);
+      }
       document.getElementById('voucher-lgpd-timestamp').textContent = formatTimestampBr(inscricao.DATA_HORA_ACEITE);
 
       const statusBadge = document.getElementById('voucher-status-badge');
@@ -850,6 +956,44 @@
       document.getElementById('sc-ev-data').textContent = formatDateBr(ev.DATA_EVENTO);
       document.getElementById('sc-ev-hora').textContent = ev.HORA_EVENTO ? `${ev.HORA_EVENTO}h` : '—';
       document.getElementById('sc-ev-local').textContent = ev.LOCAL || '—';
+      const scMapLink = document.getElementById('sc-ev-map-link');
+      if (scMapLink) {
+        scMapLink.href = resolveEventMapUrl(ev);
+      }
+
+      const lockedBox = document.getElementById('sc-locked-window-box');
+      const autoBox = document.getElementById('sc-auto-detected-box');
+      const manualBox = document.getElementById('sc-manual-form-box');
+      const footerNotReg = document.getElementById('sc-not-registered-footer');
+      const headerBadge = document.getElementById('sc-header-status-badge');
+
+      const win = evaluateEventCheckInWindowClient(ev);
+      if (!win.isOpen) {
+        if (headerBadge) {
+          headerBadge.className = 'badge-ccb-pendente';
+          headerBadge.textContent = 'CHECK-IN BLOQUEADO';
+        }
+        const msgEl = document.getElementById('sc-locked-window-msg');
+        const dtEl = document.getElementById('sc-locked-release-datetime');
+        if (msgEl) {
+          msgEl.textContent = win.lockMessage;
+        }
+        if (dtEl) {
+          dtEl.textContent = `${win.releaseDateBr} às ${win.releaseTime}h`;
+        }
+        if (lockedBox) lockedBox.classList.remove('d-none');
+        if (autoBox) autoBox.classList.add('d-none');
+        if (manualBox) manualBox.classList.add('d-none');
+        if (footerNotReg) footerNotReg.classList.add('d-none');
+        return;
+      }
+
+      if (headerBadge) {
+        headerBadge.className = 'badge-ccb-ativo';
+        headerBadge.textContent = 'CHECK-IN LIBERADO';
+      }
+      if (lockedBox) lockedBox.classList.add('d-none');
+      if (footerNotReg) footerNotReg.classList.remove('d-none');
 
       // Verifica automaticamente Conta Google logada ou Credencial salva no aparelho
       const savedUuid = getDeviceCredential(ev.ID_EVENTO);
@@ -927,44 +1071,76 @@
           METHOD: AppState.portal.autoMatchSource,
           ID_INSCRICAO: cand.ID_INSCRICAO
         });
+        setLoading(false);
 
         saveDeviceCredential(ev.ID_EVENTO, response.inscricao.ID_INSCRICAO);
         AppState.portal.lastVoucher = response;
+        renderVoucherScreen(response);
+
         playBeepSound('success');
         toastr.success(response.message);
 
-        await Swal.fire({
+        Swal.fire({
           title: response.alreadyCheckedIn ? 'Presença Já Registrada!' : 'Presença Confirmada!',
           text: response.message,
           icon: 'success',
           confirmButtonColor: '#033D60'
         });
-
-        renderVoucherScreen(response);
       } catch (err) {
+        setLoading(false);
         playBeepSound('error');
         toastr.error(err.message);
-      } finally {
-        setLoading(false);
       }
     }
 
     /**
-     * Executa o Auto Check-in validando E-mail OU Telefone informados pelo participante.
+     * Executa o Auto Check-in validando o campo selecionado no selectbox (E-mail ou Telefone).
      * @param {Event} event Submit event.
      */
     async function handleManualSelfCheckinSubmit(event) {
       event.preventDefault();
-      if (!validateEitherEmailOrPhone('sc-email', 'sc-telefone', 4)) {
-        toastr.warning('Informe pelo menos o E-mail da inscrição ou o Telefone (completo ou 4 últimos dígitos).');
-        return;
+
+      const tipoValidacao = jQuery('#sc-tipo-validacao').val() || 'EMAIL';
+      const emailEl = document.getElementById('sc-email');
+      const phoneEl = document.getElementById('sc-telefone');
+      const wrapEmail = document.getElementById('wrap-sc-email');
+      const wrapPhone = document.getElementById('wrap-sc-telefone');
+
+      let email = '';
+      let telefone = '';
+
+      if (tipoValidacao === 'EMAIL') {
+        email = emailEl ? emailEl.value.trim() : '';
+        const emailValid = email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+        if (!emailValid) {
+          if (wrapEmail) wrapEmail.classList.add('has-error');
+          if (emailEl) {
+            emailEl.setAttribute('aria-invalid', 'true');
+            emailEl.focus();
+          }
+          toastr.warning('Informe um endereço de e-mail válido cadastrado na inscrição.');
+          return;
+        }
+        if (wrapEmail) wrapEmail.classList.remove('has-error');
+        if (emailEl) emailEl.removeAttribute('aria-invalid');
+      } else {
+        telefone = phoneEl ? phoneEl.value.trim() : '';
+        const digits = telefone.replace(/\D/g, '');
+        if (digits.length < 4) {
+          if (wrapPhone) wrapPhone.classList.add('has-error');
+          if (phoneEl) {
+            phoneEl.setAttribute('aria-invalid', 'true');
+            phoneEl.focus();
+          }
+          toastr.warning('Informe o telefone cadastrado ou os 4 últimos dígitos.');
+          return;
+        }
+        if (wrapPhone) wrapPhone.classList.remove('has-error');
+        if (phoneEl) phoneEl.removeAttribute('aria-invalid');
       }
 
       const ev = AppState.portal.activeEvent;
       if (!ev) return;
-
-      const email = document.getElementById('sc-email').value.trim();
-      const telefone = document.getElementById('sc-telefone').value.trim();
 
       try {
         setLoading(true, 'Validando dados de inscrição e confirmando presença...');
@@ -974,13 +1150,16 @@
           EMAIL: email,
           TELEFONE: telefone
         });
+        setLoading(false);
 
         saveDeviceCredential(ev.ID_EVENTO, response.inscricao.ID_INSCRICAO);
         AppState.portal.lastVoucher = response;
+        renderVoucherScreen(response);
+
         playBeepSound('success');
         toastr.success(response.message);
 
-        await Swal.fire({
+        Swal.fire({
           title: response.alreadyCheckedIn ? 'Presença Já Confirmada!' : 'Presença Confirmada com Sucesso!',
           html: `
             <div class="fw-bold fs-5 mb-1" style="color: #033D60;">${escapeHtml(
@@ -993,9 +1172,8 @@
           icon: 'success',
           confirmButtonColor: '#033D60'
         });
-
-        renderVoucherScreen(response);
       } catch (err) {
+        setLoading(false);
         playBeepSound('error');
         toastr.error(err.message);
         Swal.fire({
@@ -1004,8 +1182,6 @@
           icon: 'warning',
           confirmButtonColor: '#033D60'
         });
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -1036,6 +1212,7 @@
         applyAdminBundle(bundle);
         toastr.success('Acesso administrativo liberado com sucesso.');
       } catch (err) {
+        setLoading(false);
         toastr.error(err.message);
         Swal.fire({
           title: 'Falha de Autenticação',
@@ -1083,6 +1260,14 @@
       if (bundle.metadata) {
         AppState.portal.metadata = bundle.metadata;
       }
+
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const activeList = (bundle.eventos || []).filter(
+        (ev) => ev.STATUS === 'ATIVO' && ev.DATA_EVENTO >= todayIso
+      );
+      AppState.portal.activeEvents = activeList;
+      AppState.portal.activeEvent = activeList.length > 0 ? activeList[0] : null;
+      AppState.portal.hasActiveEvent = activeList.length > 0;
 
       populateAdminEventSelects(bundle.eventos || [], AppState.admin.filterEventoId);
       renderDashboardKpisAndTables(bundle);
@@ -1351,7 +1536,7 @@
         ['CONGREGAÇÃO CRISTÃ NO BRASIL (CCB) - REGIONAL CAMPINAS/SP'],
         ['COMISSÃO DE NEGOCIADORES DE SUPRIMENTOS (CNS) - RELATÓRIO OFICIAL'],
         ['Logotipo CCB (Drive)', Environment.LOGOS ? Environment.LOGOS.CCB_PRIMARY_URL : 'https://drive.google.com/file/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM/view'],
-        ['Logotipo CNS (Drive)', Environment.LOGOS ? Environment.LOGOS.CNS_PRIMARY_URL : 'https://drive.google.com/file/d/18-Zp2KDNPP0QcsSWzUDYzaQLtvUibrQP/view'],
+        ['Logotipo CNS (Drive)', Environment.LOGOS ? Environment.LOGOS.CNS_PRIMARY_URL : 'https://drive.google.com/file/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah/view'],
         ['Data de Geração', formatTimestampBr(bundle.generatedAt)],
         ['Escopo do Filtro', bundle.filterEventoId === 'ALL' ? 'Consolidado Histórico' : bundle.filterEventoId],
         [],
@@ -1381,8 +1566,6 @@
         NOME_COMPLETO: ins.NOME_COMPLETO,
         CIDADE: ins.CIDADE,
         FUNCAO: ins.FUNCAO,
-        EMAIL: ins.EMAIL,
-        TELEFONE: ins.TELEFONE,
         ACEITE_LGPD: ins.ACEITE_LGPD ? 'SIM' : 'NÃO',
         DATA_HORA_ACEITE: ins.DATA_HORA_ACEITE,
         PRESENCA_CONFIRMADA: ins.PRESENCA_CONFIRMADA ? 'SIM' : 'NÃO',
@@ -1418,6 +1601,84 @@
       toastr.success('Planilha Excel (.xlsx) exportada com sucesso!');
     }
 
+    /**
+     * Exporta qualquer card (Gráfico ou Tabela) em formato de imagem PNG de alta resolução.
+     * Utiliza html2canvas para capturar o cabeçalho institucional CCB e o conteúdo completo
+     * do gráfico ou tabela, omitindo automaticamente botões de ação (.no-export-png).
+     *
+     * @param {HTMLElement} buttonEl Botão acionado no cabeçalho do card.
+     */
+    async function exportCardElementToPng(buttonEl) {
+      if (!buttonEl) return;
+      const targetCardId = buttonEl.getAttribute('data-target-card');
+      const targetCanvasId = buttonEl.getAttribute('data-target-canvas');
+      const filenamePrefix = buttonEl.getAttribute('data-filename') || 'Relatorio_CNS';
+      const cardEl = targetCardId ? document.getElementById(targetCardId) : null;
+
+      if (!cardEl) {
+        toastr.warning('Elemento não encontrado para exportação.');
+        return;
+      }
+
+      const originalHtml = buttonEl.innerHTML;
+      buttonEl.disabled = true;
+      buttonEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Exportando...';
+
+      try {
+        let dataUrl = '';
+
+        if (window.html2canvas) {
+          const renderedCanvas = await window.html2canvas(cardEl, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#FFFFFF',
+            logging: false,
+            ignoreElements: (el) =>
+              Boolean(el && el.classList && el.classList.contains('no-export-png'))
+          });
+          dataUrl = renderedCanvas.toDataURL('image/png');
+        } else if (targetCanvasId) {
+          const chartCanvas = document.getElementById(targetCanvasId);
+          if (chartCanvas) {
+            const outCanvas = document.createElement('canvas');
+            outCanvas.width = chartCanvas.width + 48;
+            outCanvas.height = chartCanvas.height + 84;
+            const ctx = outCanvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+            ctx.fillStyle = '#033D60';
+            ctx.fillRect(0, 0, outCanvas.width, 48);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 15px Verdana, sans-serif';
+            const titleEl = cardEl.querySelector('.ccb-card-header h3');
+            ctx.fillText(titleEl ? titleEl.textContent.trim() : 'Agenda CNS', 18, 30);
+            ctx.drawImage(chartCanvas, 24, 64);
+            dataUrl = outCanvas.toDataURL('image/png');
+          }
+        }
+
+        if (!dataUrl) {
+          throw new Error('Não foi possível renderizar a imagem PNG neste navegador.');
+        }
+
+        const fileDate = new Date().toISOString().slice(0, 10);
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `${filenamePrefix}_${fileDate}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toastr.success('Imagem PNG exportada com sucesso!');
+      } catch (err) {
+        toastr.error(err.message || 'Erro ao exportar imagem PNG.');
+      } finally {
+        buttonEl.disabled = false;
+        buttonEl.innerHTML = originalHtml;
+      }
+    }
+
     /* ========================================================================
      * ABA 2: GESTÃO DE EVENTOS (CRUD + CARTAZ QR CODE DO EVENTO)
      * ======================================================================== */
@@ -1439,11 +1700,16 @@
       tbody.innerHTML = eventos
         .map((ev) => {
           const isAtivo = ev.STATUS === 'ATIVO';
-          const statusBadge = isAtivo
-            ? '<span class="badge-ccb-ativo">ATIVO</span>'
-            : '<span class="badge-ccb-encerrado">ENCERRADO</span>';
+          const isPrevisto = ev.STATUS === 'PREVISTO';
+          let statusBadge = '<span class="badge-ccb-encerrado">ENCERRADO</span>';
+          if (isAtivo) {
+            statusBadge = '<span class="badge-ccb-ativo">ATIVO</span>';
+          } else if (isPrevisto) {
+            statusBadge = '<span class="badge-ccb-previsto">PREVISTO</span>';
+          }
+
           const toggleTarget = isAtivo ? 'ENCERRADO' : 'ATIVO';
-          const toggleLabel = isAtivo ? 'Encerrar' : 'Reativar';
+          const toggleLabel = isAtivo ? 'Encerrar Reunião' : 'Ativar no Portal';
           const toggleIcon = isAtivo ? 'bi-lock-fill' : 'bi-unlock-fill';
 
           return `
@@ -1455,13 +1721,24 @@
               <td data-label="Data" class="text-nowrap">${formatDateBr(ev.DATA_EVENTO)}</td>
               <td data-label="Início" class="text-nowrap">${escapeHtml(ev.HORA_EVENTO)}h</td>
               <td data-label="Lanche" class="text-nowrap">${escapeHtml(ev.HORA_LANCHE)}h</td>
-              <td data-label="Local">${escapeHtml(ev.LOCAL)}</td>
+              <td data-label="Local">
+                <div>${escapeHtml(ev.LOCAL)}</div>
+                <a
+                  href="${escapeHtml(resolveEventMapUrl(ev))}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="small text-decoration-none no-export-png"
+                  style="color: #033D60; font-size: 0.75rem;"
+                >
+                  <i class="bi bi-geo-alt-fill me-1"></i>Ver no Mapa
+                </a>
+              </td>
               <td data-label="Inscritos / Presentes" class="text-center">
                 <span class="fw-bold">${ev.TOTAL_INSCRITOS || 0}</span> inscr. /
                 <span class="fw-bold" style="color: #438E76;">${ev.TOTAL_PRESENTES || 0}</span> pres.
               </td>
               <td data-label="Status" class="text-center">${statusBadge}</td>
-              <td data-label="Ações" class="text-end text-nowrap">
+              <td data-label="Ações" class="text-end text-nowrap no-export-png">
                 <div class="btn-group btn-group-sm">
                   <button
                     type="button"
@@ -1551,6 +1828,7 @@
       FormAccessibilityBridge.resetFormValidation(form);
 
       const modalTitle = document.getElementById('modal-evento-label');
+      const linkMapaEl = document.getElementById('ev-link-mapa');
       if (evento) {
         modalTitle.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Editar Reunião / Convocação';
         document.getElementById('ev-id').value = evento.ID_EVENTO;
@@ -1559,11 +1837,13 @@
         document.getElementById('ev-hora').value = evento.HORA_EVENTO;
         document.getElementById('ev-lanche').value = evento.HORA_LANCHE;
         document.getElementById('ev-local').value = evento.LOCAL;
+        if (linkMapaEl) linkMapaEl.value = evento.LINK_MAPA || '';
         jQuery('#ev-status').val(evento.STATUS).trigger('change');
       } else {
         modalTitle.innerHTML = '<i class="bi bi-calendar-plus me-2"></i>Cadastrar Nova Reunião / Convocação';
         form.reset();
         document.getElementById('ev-id').value = '';
+        if (linkMapaEl) linkMapaEl.value = '';
         jQuery('#ev-status').val('ATIVO').trigger('change');
       }
 
@@ -1573,7 +1853,23 @@
     }
 
     /**
+     * Localiza outros eventos que estejam atualmente com status ATIVO na base carregada.
+     * @param {string} [excludeId=''] UUID do evento atual a ignorar.
+     * @returns {Array<Object>}
+     */
+    function findOtherActiveEventos(excludeId = '') {
+      const cleanExclude = String(excludeId || '').trim().toLowerCase();
+      const lista = (AppState.admin.bundle && AppState.admin.bundle.eventos) || [];
+      return lista.filter(
+        (ev) =>
+          ev.STATUS === 'ATIVO' &&
+          (!cleanExclude || ev.ID_EVENTO.toLowerCase() !== cleanExclude)
+      );
+    }
+
+    /**
      * Submete o formulário de criação/edição de reunião.
+     * Ao definir um evento como ATIVO, alerta caso já exista outro evento ATIVO que será encerrado.
      * @param {Event} event Evento de submit.
      */
     async function handleSaveEventoSubmit(event) {
@@ -1584,6 +1880,7 @@
         return;
       }
 
+      const linkMapaEl = document.getElementById('ev-link-mapa');
       const payload = {
         ID_EVENTO: document.getElementById('ev-id').value.trim(),
         TITULO: document.getElementById('ev-titulo').value.trim(),
@@ -1591,18 +1888,39 @@
         HORA_EVENTO: document.getElementById('ev-hora').value.trim(),
         HORA_LANCHE: document.getElementById('ev-lanche').value.trim(),
         LOCAL: document.getElementById('ev-local').value.trim(),
+        LINK_MAPA: linkMapaEl ? linkMapaEl.value.trim() : '',
         STATUS: jQuery('#ev-status').val() || 'ATIVO'
       };
 
       const isEdit = Boolean(payload.ID_EVENTO);
+      const otherActives =
+        payload.STATUS === 'ATIVO' ? findOtherActiveEventos(payload.ID_EVENTO) : [];
+
+      const activeWarningHtml =
+        otherActives.length > 0
+          ? `<div class="alert alert-warning text-start small mt-3 mb-0">
+               <i class="bi bi-exclamation-triangle-fill me-1"></i>
+               <strong>Atenção:</strong> A reunião <strong>"${escapeHtml(
+                 otherActives.map((e) => `${e.TITULO} (${formatDateBr(e.DATA_EVENTO)})`).join(', ')
+               )}"</strong> encontra-se atualmente como <strong>ATIVA</strong>.<br>
+               Como apenas um evento pode ficar ativo por vez no Portal e no Check-in, o evento ativo anterior será automaticamente alterado para <strong>ENCERRADO</strong>.
+             </div>`
+          : '';
+
       const confirm = await Swal.fire({
         title: isEdit ? 'Salvar alterações da reunião?' : 'Confirmar criação da reunião?',
-        text: `${payload.TITULO} (${formatDateBr(payload.DATA_EVENTO)} às ${payload.HORA_EVENTO}h)`,
-        icon: 'question',
+        html: `
+          <div>${escapeHtml(payload.TITULO)} (${formatDateBr(payload.DATA_EVENTO)} às ${escapeHtml(
+            payload.HORA_EVENTO
+          )}h) &mdash; Status: <strong>${escapeHtml(payload.STATUS)}</strong></div>
+          ${activeWarningHtml}
+        `,
+        icon: otherActives.length > 0 ? 'warning' : 'question',
         showCancelButton: true,
         confirmButtonColor: '#033D60',
         cancelButtonColor: '#49656C',
-        confirmButtonText: 'Sim, Gravar',
+        confirmButtonText:
+          otherActives.length > 0 ? 'Sim, Ativar e Encerrar Anterior' : 'Sim, Gravar',
         cancelButtonText: 'Cancelar'
       });
 
@@ -1631,16 +1949,31 @@
 
     /**
      * Alterna o status ATIVO / ENCERRADO de uma reunião com confirmação SweetAlert2.
+     * Caso vá ativar a reunião e exista outra reunião ATIVA, informa que a anterior será encerrada.
      */
     async function handleToggleEventoStatus(idEvento, nextStatus, titulo) {
+      const otherActives = nextStatus === 'ATIVO' ? findOtherActiveEventos(idEvento) : [];
+      const activeWarningHtml =
+        otherActives.length > 0
+          ? `<div class="alert alert-warning text-start small mt-3 mb-0">
+               <i class="bi bi-exclamation-triangle-fill me-1"></i>
+               <strong>Atenção:</strong> A reunião <strong>"${escapeHtml(
+                 otherActives.map((e) => `${e.TITULO} (${formatDateBr(e.DATA_EVENTO)})`).join(', ')
+               )}"</strong> está ativa no momento e será automaticamente alterada para <strong>ENCERRADO</strong>.
+             </div>`
+          : '';
+
       const confirm = await Swal.fire({
         title: `Alterar status para ${nextStatus}?`,
-        text: `Reunião: "${titulo}"`,
+        html: `<div>Reunião: <strong>"${escapeHtml(titulo)}"</strong></div>${activeWarningHtml}`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#033D60',
         cancelButtonColor: '#49656C',
-        confirmButtonText: `Sim, definir como ${nextStatus}`,
+        confirmButtonText:
+          otherActives.length > 0
+            ? 'Sim, Ativar e Encerrar Anterior'
+            : `Sim, definir como ${nextStatus}`,
         cancelButtonText: 'Cancelar'
       });
 
@@ -1772,13 +2105,13 @@
                 <div class="small fw-bold">${escapeHtml(ins.EVENTO_TITULO)}</div>
                 <div class="text-secondary" style="font-size: 0.72rem;">${formatDateBr(ins.EVENTO_DATA)}</div>
               </td>
-              <td data-label="Contato" class="small">
+              <td data-label="Contato" class="small no-export-png no-print">
                 <div><i class="bi bi-envelope text-secondary me-1"></i>${escapeHtml(ins.EMAIL || '—')}</div>
                 <div><i class="bi bi-telephone text-secondary me-1"></i>${escapeHtml(ins.TELEFONE || '—')}</div>
               </td>
               <td data-label="LGPD" class="text-center">${lgpdBadge}</td>
               <td data-label="Presença" class="text-center">${presencaBadge}</td>
-              <td data-label="Ações" class="text-end text-nowrap">
+              <td data-label="Ações" class="text-end text-nowrap no-export-png">
                 <div class="btn-group btn-group-sm">
                   <button
                     type="button"
@@ -2283,6 +2616,28 @@
         switchView('portal', { instantCheckInMode: true });
       });
 
+      const btnRecheckWin = document.getElementById('btn-sc-recheck-window');
+      if (btnRecheckWin) {
+        btnRecheckWin.addEventListener('click', () => {
+          const ev = AppState.portal.activeEvent;
+          const win = evaluateEventCheckInWindowClient(ev);
+          renderSelfCheckinView();
+          if (win.isOpen) {
+            toastr.success('O horário de credenciamento já foi liberado!');
+          } else {
+            toastr.info(win.lockMessage);
+          }
+        });
+      }
+
+      const btnLockedGotoPortal = document.getElementById('btn-sc-locked-goto-portal');
+      if (btnLockedGotoPortal) {
+        btnLockedGotoPortal.addEventListener('click', () => {
+          AppState.portal.lastVoucher = null;
+          switchView('portal', { instantCheckInMode: false });
+        });
+      }
+
       // Botões de Auto-Detecção no Self Check-in
       document.getElementById('btn-sc-oneclick-confirm').addEventListener('click', handleOneClickSelfCheckin);
       document.getElementById('btn-sc-not-me').addEventListener('click', () => {
@@ -2334,8 +2689,44 @@
 
       // Vincula pares E-mail / Telefone (onde pelo menos um é obrigatório)
       bindEitherEmailOrPhonePair('pub-email', 'pub-telefone');
-      bindEitherEmailOrPhonePair('sc-email', 'sc-telefone');
       bindEitherEmailOrPhonePair('man-email', 'man-telefone');
+
+      // Alternância entre validação por E-mail ou Telefone no Self Check-in
+      jQuery('#sc-tipo-validacao').on('change', function () {
+        const tipo = jQuery(this).val() || 'EMAIL';
+        const wrapEmail = document.getElementById('wrap-sc-email');
+        const wrapPhone = document.getElementById('wrap-sc-telefone');
+        const emailEl = document.getElementById('sc-email');
+        const phoneEl = document.getElementById('sc-telefone');
+
+        if (wrapEmail) wrapEmail.classList.remove('has-error');
+        if (wrapPhone) wrapPhone.classList.remove('has-error');
+        if (emailEl) emailEl.removeAttribute('aria-invalid');
+        if (phoneEl) phoneEl.removeAttribute('aria-invalid');
+
+        if (tipo === 'TELEFONE') {
+          if (wrapEmail) wrapEmail.classList.add('d-none');
+          if (wrapPhone) wrapPhone.classList.remove('d-none');
+          if (emailEl) emailEl.value = '';
+          if (phoneEl) phoneEl.focus();
+        } else {
+          if (wrapPhone) wrapPhone.classList.add('d-none');
+          if (wrapEmail) wrapEmail.classList.remove('d-none');
+          if (phoneEl) phoneEl.value = '';
+          if (emailEl) emailEl.focus();
+        }
+      });
+
+      ['sc-email', 'sc-telefone'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', () => {
+            const wrap = el.closest('.col-md-7');
+            if (wrap) wrap.classList.remove('has-error');
+            el.removeAttribute('aria-invalid');
+          });
+        }
+      });
 
       // Botões do Comprovante QR Code
       document.getElementById('btn-voucher-download').addEventListener('click', () => {
@@ -2389,9 +2780,13 @@
         }
       });
 
-      // Exportações Dashboard (Excel e PDF)
+      // Exportações Dashboard (Excel, PDF e PNG de Gráficos/Tabelas)
       document.getElementById('btn-export-xlsx').addEventListener('click', exportDashboardToExcel);
       document.getElementById('btn-export-pdf').addEventListener('click', () => window.print());
+
+      document.querySelectorAll('.js-btn-export-png').forEach((btn) => {
+        btn.addEventListener('click', () => exportCardElementToPng(btn));
+      });
 
       // Botão Nova Reunião
       document.getElementById('btn-novo-evento').addEventListener('click', () => openEventoModal(null));
@@ -2452,7 +2847,18 @@
       });
 
       document.getElementById('btn-print-poster').addEventListener('click', () => {
+        const mainEl = document.getElementById('main-app-container') || document.querySelector('main');
+        document.body.classList.add('print-poster-mode');
+        if (mainEl) mainEl.classList.add('d-none');
+
+        const cleanup = () => {
+          document.body.classList.remove('print-poster-mode');
+          if (mainEl) mainEl.classList.remove('d-none');
+          window.removeEventListener('afterprint', cleanup);
+        };
+        window.addEventListener('afterprint', cleanup);
         window.print();
+        setTimeout(cleanup, 800);
       });
 
       // Filtros da Tabela de Inscrições
