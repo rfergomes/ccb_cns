@@ -659,6 +659,17 @@
     background-color: #F1F5F8;
   }
 
+  .ccb-table tfoot td,
+  .ccb-table tfoot th {
+    background-color: #E9EEF2;
+    color: var(--ccb-primary);
+    font-weight: 700;
+    border-top: 2px solid var(--ccb-primary);
+    border-bottom: none;
+    padding: 0.8rem 0.75rem;
+    white-space: nowrap;
+  }
+
   /* Terminal Leitor de QR Code (html5-qrcode) */
   #qr-reader-viewport {
     width: 100%;
@@ -841,6 +852,14 @@
       justify-content: flex-end;
     }
 
+    .ccb-table-mobile-cards tfoot td:empty {
+      display: none;
+    }
+
+    .ccb-table-mobile-cards tfoot td {
+      text-align: center !important;
+    }
+
     .ccb-table-mobile-cards tbody td[data-label]::before {
       content: attr(data-label);
       font-weight: 700;
@@ -902,6 +921,11 @@
 
   /* Regras de Impressão (Comprovante QR Code, Cartaz QR Code do Evento e Relatório PDF) */
   @media print {
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
     html,
     body {
       height: auto !important;
@@ -914,6 +938,18 @@
       padding: 0 !important;
     }
 
+    main,
+    #main-app-container,
+    .container,
+    .tab-content,
+    .tab-pane.active {
+      max-width: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+    }
+
     .no-print,
     .ccb-navbar,
     .ccb-nav-tabs,
@@ -922,13 +958,51 @@
       display: none !important;
     }
 
-    .ccb-card,
-    .qr-voucher-container,
-    .kpi-card {
+    .ccb-card {
+      overflow: visible !important;
+      container-type: normal !important;
+      height: auto !important;
       box-shadow: none !important;
-      border: 1px solid #000000 !important;
-      break-inside: avoid;
-      page-break-inside: avoid;
+      border: 1px solid #033D60 !important;
+      margin-bottom: 0.9rem !important;
+      background-color: #FFFFFF !important;
+    }
+
+    .qr-voucher-container,
+    .kpi-card,
+    #card-chart-cidades,
+    #card-chart-funcoes,
+    #card-chart-anual,
+    #card-table-cidades {
+      box-shadow: none !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    .ccb-card-header,
+    .ccb-table thead th,
+    .ccb-table tfoot td,
+    .ccb-table tfoot th,
+    .badge-ccb-ativo,
+    .badge-ccb-encerrado,
+    .badge-ccb-previsto,
+    .kpi-card {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    .ccb-card-header {
+      background-color: #033D60 !important;
+      color: #FFFFFF !important;
+      padding: 0.6rem 0.9rem !important;
+      border-bottom: 2px solid #033D60 !important;
+    }
+
+    .ccb-card-header h2,
+    .ccb-card-header h3,
+    .ccb-card-header h4 {
+      color: #FFFFFF !important;
+      font-size: 0.95rem !important;
     }
 
     .print-only-header {
@@ -936,8 +1010,102 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 2px solid #033D60;
-      margin-bottom: 1.25rem;
-      padding-bottom: 0.75rem;
+      margin-bottom: 0.9rem;
+      padding-bottom: 0.55rem;
+    }
+
+    /* Grade compacta para os 4 KPIs no topo da página 1 */
+    .ccb-print-kpi-row {
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      gap: 0.55rem !important;
+      margin-bottom: 0.9rem !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+
+    .ccb-print-kpi-row > [class*="col-"] {
+      width: 100% !important;
+      max-width: 100% !important;
+      padding: 0 !important;
+    }
+
+    .kpi-card {
+      border: 1px solid #033D60 !important;
+      border-top: 3px solid #033D60 !important;
+      padding: 0.55rem 0.65rem !important;
+    }
+
+    .kpi-value {
+      font-size: 1.35rem !important;
+    }
+
+    /* Empilha os gráficos em largura total (evita corte lateral e divisão em colunas flex) */
+    .ccb-print-stack-row {
+      display: block !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+
+    .ccb-print-stack-row > [class*="col-"] {
+      width: 100% !important;
+      max-width: 100% !important;
+      flex: none !important;
+      display: block !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      margin-bottom: 0.9rem !important;
+    }
+
+    .ccb-chart-box {
+      position: relative !important;
+      height: auto !important;
+      min-height: 0 !important;
+      width: 100% !important;
+      overflow: visible !important;
+    }
+
+    .ccb-chart-box canvas {
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+      display: block !important;
+    }
+
+    .ccb-chart-box-doughnut canvas {
+      width: auto !important;
+      max-width: 100% !important;
+      max-height: 280px !important;
+      height: auto !important;
+      margin: 0 auto !important;
+    }
+
+    /* Tabelas sem rolagem nem recorte horizontal na impressão */
+    .table-responsive {
+      overflow: visible !important;
+    }
+
+    .ccb-table,
+    #chart-anual-summary-wrap table {
+      width: 100% !important;
+      font-size: 0.74rem !important;
+    }
+
+    .ccb-table thead,
+    #chart-anual-summary-wrap table thead {
+      display: table-header-group;
+    }
+
+    .ccb-table tr,
+    #chart-anual-summary-wrap table tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .ccb-table th,
+    .ccb-table td {
+      white-space: normal !important;
+      padding: 0.38rem 0.45rem !important;
     }
 
     /* Quando um modal (ex.: Cartaz QR Code do Evento) está aberto na hora de imprimir,

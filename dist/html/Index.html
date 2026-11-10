@@ -796,7 +796,7 @@
             </div>
 
             <!-- Cards de KPIs de Topo -->
-            <div class="row g-3 mb-4">
+            <div class="row g-3 mb-4 ccb-print-kpi-row">
               <div class="col-sm-6 col-xl-3">
                 <div class="kpi-card">
                   <div class="kpi-title"><i class="bi bi-journal-check me-1"></i>Total de Inscrições</div>
@@ -828,7 +828,7 @@
             </div>
 
             <!-- Gráficos Chart.js -->
-            <div class="row g-4 mb-4">
+            <div class="row g-4 mb-4 ccb-print-stack-row">
               <!-- Gráfico de Barras: Distribuição por Cidade -->
               <div class="col-lg-7">
                 <div id="card-chart-cidades" class="ccb-card h-100">
@@ -846,7 +846,7 @@
                     </button>
                   </div>
                   <div class="p-3">
-                    <div style="position: relative; height: 340px;">
+                    <div class="ccb-chart-box" style="position: relative; height: 340px;">
                       <canvas id="chart-cidades"></canvas>
                     </div>
                   </div>
@@ -870,8 +870,46 @@
                     </button>
                   </div>
                   <div class="p-3">
-                    <div style="position: relative; height: 340px;">
+                    <div class="ccb-chart-box ccb-chart-box-doughnut" style="position: relative; height: 340px;">
                       <canvas id="chart-funcoes"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gráfico Anual: Evolução de Inscrições e Presenças -->
+              <div class="col-12">
+                <div id="card-chart-anual" class="ccb-card">
+                  <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <h3 class="fs-6 mb-0">
+                      <i class="bi bi-graph-up-arrow me-2"></i>Evolução Anual de Reuniões, Inscrições e Presenças &mdash; <span id="chart-anual-ano-label">Ano Atual</span>
+                    </h3>
+                    <div class="d-flex flex-wrap align-items-center gap-2 no-print no-export-png">
+                      <label for="chart-anual-select-ano" class="small text-white mb-0 fw-normal">Ano:</label>
+                      <select
+                        id="chart-anual-select-ano"
+                        class="form-select form-select-sm"
+                        style="width: auto; min-width: 115px; font-size: 0.78rem; padding-top: 0.2rem; padding-bottom: 0.2rem;"
+                      >
+                      </select>
+                      <button
+                        type="button"
+                        class="btn btn-ccb-header-export js-btn-export-png"
+                        data-target-card="card-chart-anual"
+                        data-target-canvas="chart-anual"
+                        data-filename="Grafico_Anual_Inscricoes_Presencas_CNS"
+                        title="Exportar gráfico anual como imagem PNG"
+                      >
+                        <i class="bi bi-image me-1"></i>Exportar PNG
+                      </button>
+                    </div>
+                  </div>
+                  <div class="p-3">
+                    <div class="ccb-chart-box" style="position: relative; height: 290px;">
+                      <canvas id="chart-anual"></canvas>
+                    </div>
+                    <!-- Grade Sintética Compacta (Exibe Reuniões, Inscritos, Presentes e Ausentes sem poluir o gráfico) -->
+                    <div id="chart-anual-summary-wrap" class="table-responsive mt-3 pt-2 border-top">
                     </div>
                   </div>
                 </div>
@@ -905,6 +943,42 @@
                   </thead>
                   <tbody id="dashboard-cidades-tbody">
                   </tbody>
+                  <tfoot id="dashboard-cidades-tfoot">
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            <!-- Quadro Analítico Agrupado por Cidade e Função / Ministério -->
+            <div id="card-table-cidades-funcoes" class="ccb-card mt-4">
+              <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h3 class="fs-6 mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Quadro Analítico por Cidade e Função / Ministério (Regional Campinas)</h3>
+                <button
+                  type="button"
+                  class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
+                  data-target-card="card-table-cidades-funcoes"
+                  data-filename="Quadro_Cidade_Funcao_CNS"
+                  title="Exportar tabela como imagem PNG"
+                >
+                  <i class="bi bi-image me-1"></i>Exportar PNG
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table ccb-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>Cidade / Grupo</th>
+                      <th>Função / Ministério</th>
+                      <th class="text-center">Inscritos</th>
+                      <th class="text-center">Presentes no Local</th>
+                      <th class="text-center">Ausentes / Pendentes</th>
+                      <th class="text-center">Aproveitamento (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-cidades-funcoes-tbody">
+                  </tbody>
+                  <tfoot id="dashboard-cidades-funcoes-tfoot">
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -1030,6 +1104,8 @@
                     </thead>
                     <tbody id="inscricoes-tbody">
                     </tbody>
+                    <tfoot id="inscricoes-tfoot">
+                    </tfoot>
                   </table>
                 </div>
               </div>
@@ -1204,7 +1280,8 @@
                   type="text"
                   id="ev-local"
                   class="form-control"
-                  placeholder="Ex: Casa de Oração Central / Administração Regional Campinas - Rua..."
+                  value="R. Germânia, 661 - Bonfim, Campinas - SP"
+                  placeholder="Ex: R. Germânia, 661 - Bonfim, Campinas - SP"
                   required
                   minlength="4"
                   maxlength="240"
@@ -1213,15 +1290,34 @@
               </div>
               <div class="col-12">
                 <label for="ev-link-mapa" class="form-label">
-                  Link de Localização (Google Maps / Waze) <span class="text-secondary fw-normal small">(Opcional)</span>
+                  Link de Localização (Google Maps / Waze) <span class="text-secondary fw-normal small">(Automático pelo endereço ou personalizado)</span>
                 </label>
-                <input
-                  type="url"
-                  id="ev-link-mapa"
-                  class="form-control"
-                  placeholder="Ex: https://maps.app.goo.gl/... (se deixar em branco, o sistema gera a busca automática pelo endereço)"
-                  maxlength="500"
-                >
+                <div class="input-group">
+                  <input
+                    type="url"
+                    id="ev-link-mapa"
+                    class="form-control"
+                    placeholder="Clique em Gerar Link ou informe manualmente a URL do mapa"
+                    maxlength="500"
+                  >
+                  <button
+                    type="button"
+                    id="btn-ev-gerar-mapa"
+                    class="btn btn-ccb-outline text-nowrap"
+                    title="Gerar link direto do Google Maps codificado a partir do endereço"
+                  >
+                    <i class="bi bi-geo-alt-fill me-1"></i>Gerar Link
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-ev-abrir-mapa"
+                    class="btn btn-outline-secondary text-nowrap"
+                    title="Abrir link de localização em nova aba para conferir o ponto no mapa"
+                  >
+                    <i class="bi bi-box-arrow-up-right"></i>
+                  </button>
+                </div>
+                <div id="ev-mapa-geocode-feedback" class="small mt-1 d-none"></div>
                 <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe um link válido iniciando com https:// ou deixe em branco.</div>
               </div>
             </div>
