@@ -290,38 +290,35 @@ class AdminService {
 
     const normalized = this.validateEventoPayload_(eventPayload);
     const idEvento = String(eventPayload.ID_EVENTO || eventPayload.idEvento || '').trim();
-    let autoClosedEvents = [];
+    const txResult = this.repository_.runInTransaction(() => {
+      let autoClosedEvents = [];
 
-    if (idEvento && SecurityUtils.isValidUuid(idEvento)) {
-      if (normalized.STATUS === Environment.EVENT_STATUS.ATIVO) {
-        autoClosedEvents = this.closeOtherActiveEventos_(idEvento);
+      if (idEvento && SecurityUtils.isValidUuid(idEvento)) {
+        if (normalized.STATUS === Environment.EVENT_STATUS.ATIVO) {
+          autoClosedEvents = this.closeOtherActiveEventos_(idEvento);
+        }
+        const updated = this.repository_.updateEventoById(idEvento, normalized);
+        return { isEdit: true, evento: updated, autoClosedEvents };
       }
-      const updated = this.repository_.updateEventoById(idEvento, normalized);
-      const extraMsg =
-        autoClosedEvents.length > 0
-          ? ` O evento ativo anterior ("${autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
-          : '';
-      return {
-        success: true,
-        message: `Reunião atualizada com sucesso!${extraMsg}`,
-        evento: updated,
-        autoClosedEvents
-      };
-    }
 
-    if (normalized.STATUS === Environment.EVENT_STATUS.ATIVO) {
-      autoClosedEvents = this.closeOtherActiveEventos_('');
-    }
-    const created = this.repository_.insertEvento(normalized);
+      if (normalized.STATUS === Environment.EVENT_STATUS.ATIVO) {
+        autoClosedEvents = this.closeOtherActiveEventos_('');
+      }
+      const created = this.repository_.insertEvento(normalized);
+      return { isEdit: false, evento: created, autoClosedEvents };
+    });
+
     const extraMsg =
-      autoClosedEvents.length > 0
-        ? ` O evento ativo anterior ("${autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
+      txResult.autoClosedEvents.length > 0
+        ? ` O evento ativo anterior ("${txResult.autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
         : '';
     return {
       success: true,
-      message: `Nova convocação / reunião cadastrada com sucesso!${extraMsg}`,
-      evento: created,
-      autoClosedEvents
+      message: txResult.isEdit
+        ? `Reunião atualizada com sucesso!${extraMsg}`
+        : `Nova convocação / reunião cadastrada com sucesso!${extraMsg}`,
+      evento: txResult.evento,
+      autoClosedEvents: txResult.autoClosedEvents
     };
   }
 
@@ -349,21 +346,24 @@ class AdminService {
       throw new Error('Status inválido. Utilize ATIVO, PREVISTO ou ENCERRADO.');
     }
 
-    let autoClosedEvents = [];
-    if (statusUpper === Environment.EVENT_STATUS.ATIVO) {
-      autoClosedEvents = this.closeOtherActiveEventos_(idEvento);
-    }
+    const txResult = this.repository_.runInTransaction(() => {
+      let autoClosedEvents = [];
+      if (statusUpper === Environment.EVENT_STATUS.ATIVO) {
+        autoClosedEvents = this.closeOtherActiveEventos_(idEvento);
+      }
+      const updated = this.repository_.updateEventoById(idEvento, { STATUS: statusUpper });
+      return { evento: updated, autoClosedEvents };
+    });
 
-    const updated = this.repository_.updateEventoById(idEvento, { STATUS: statusUpper });
     const extraMsg =
-      autoClosedEvents.length > 0
-        ? ` O evento ativo anterior ("${autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
+      txResult.autoClosedEvents.length > 0
+        ? ` O evento ativo anterior ("${txResult.autoClosedEvents.join('", "')}") foi encerrado automaticamente.`
         : '';
     return {
       success: true,
       message: `Status da reunião alterado para ${statusUpper}.${extraMsg}`,
-      evento: updated,
-      autoClosedEvents
+      evento: txResult.evento,
+      autoClosedEvents: txResult.autoClosedEvents
     };
   }
 
@@ -411,7 +411,17 @@ class AdminService {
       ? SecurityUtils.getCurrentIsoTimestamp()
       : '';
 
-    const created = this.repository_.insertInscricao(normalized);
+    const created = this.repository_.runInTransaction(() => {
+      const existing = this.repository_.findInscricoesByEventoId(normalized.ID_EVENTO);
+      const duplicate = this.inscriptionService_.findDuplicateInscricao(existing, normalized);
+      if (duplicate) {
+        throw new Error(
+          `O participante "${duplicate.NOME_COMPLETO}" já possui inscrição registrada nesta reunião (UUID: ${duplicate.ID_INSCRICAO.substring(0, 8)}...).`
+        );
+      }
+      return this.repository_.insertInscricao(normalized);
+    });
+
     return {
       success: true,
       message: 'Participante cadastrado manualmente com sucesso!',
@@ -539,6 +549,12 @@ class AdminService {
     const evento = this.repository_.findEventoById(inscricao.ID_EVENTO);
     if (!evento) {
       throw new Error('A reunião vinculada a esta credencial não foi encontrada na base.');
+    }
+
+    if (evento.STATUS !== Environment.EVENT_STATUS.ATIVO) {
+      throw new Error(
+        `Check-in bloqueado: a reunião "${evento.TITULO}" encontra-se com status ${evento.STATUS}.`
+      );
     }
 
     const windowStatus = SecurityUtils.evaluateCheckInWindow(

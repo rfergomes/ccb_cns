@@ -210,6 +210,13 @@ const Environment = (() => {
    * @returns {Object} Metadados públicos.
    */
   function getPublicMetadata() {
+    let serverNowIso = '';
+    try {
+      serverNowIso = Utilities.formatDate(new Date(), getTimeZone(), "yyyy-MM-dd'T'HH:mm:ssXXX");
+    } catch (_) {
+      serverNowIso = new Date().toISOString();
+    }
+
     return {
       appName: 'Agenda CNS',
       regional: 'Regional Campinas/SP',
@@ -221,7 +228,8 @@ const Environment = (() => {
       logos: LOGOS,
       webAppUrl: getWebAppUrl(),
       detectedGoogleEmail: getActiveGoogleUserEmail(),
-      timeZone: getTimeZone()
+      timeZone: getTimeZone(),
+      serverNowIso
     };
   }
 

@@ -300,11 +300,9 @@ function apiAdminCreateManualInscricao(adminSecret, payload, currentFilterId) {
  * @param {string} [currentFilterId='ALL'] Filtro atual do dashboard.
  * @returns {Object} Resultado e bundle atualizado.
  */
-function apiAdminSetPresencaManual(adminSecret, idInscricao, presencaConfirmada, currentFilterId) {
+function apiAdminSetPresencaManual(adminSecret, idInscricao, presencaConfirmada) {
   const adminService = new AdminService();
-  const result = adminService.setPresencaManual(adminSecret, idInscricao, presencaConfirmada);
-  const bundle = adminService.getAdminDataBundle(adminSecret, currentFilterId || 'ALL');
-  return { ...result, bundle };
+  return adminService.setPresencaManual(adminSecret, idInscricao, presencaConfirmada);
 }
 
 /**
@@ -331,15 +329,9 @@ function apiAdminDeleteInscricao(adminSecret, idInscricao, currentFilterId) {
  * @param {string} [currentFilterId='ALL'] Filtro atual do dashboard.
  * @returns {Object} Resultado do check-in e bundle atualizado.
  */
-function apiAdminProcessQrCheckIn(adminSecret, qrCodePayload, expectedEventoId, currentFilterId) {
+function apiAdminProcessQrCheckIn(adminSecret, qrCodePayload, expectedEventoId) {
   const adminService = new AdminService();
-  const result = adminService.processQrCheckIn(
-    adminSecret,
-    qrCodePayload,
-    expectedEventoId || 'ALL'
-  );
-  const bundle = adminService.getAdminDataBundle(adminSecret, currentFilterId || 'ALL');
-  return { ...result, bundle };
+  return adminService.processQrCheckIn(adminSecret, qrCodePayload, expectedEventoId || 'ALL');
 }
 
 /**

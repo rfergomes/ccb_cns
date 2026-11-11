@@ -76,6 +76,21 @@ class MockRange {
   setNumberFormat() {
     return this;
   }
+  setNumberFormats() {
+    return this;
+  }
+  clearContent() {
+    for (let r = 0; r < this.numRows; r++) {
+      const rowIndex = this.row - 1 + r;
+      if (this.sheet.rows[rowIndex]) {
+        for (let c = 0; c < this.numCols; c++) {
+          const colIndex = this.col - 1 + c;
+          this.sheet.rows[rowIndex][colIndex] = '';
+        }
+      }
+    }
+    return this;
+  }
 }
 
 class MockSheet {
@@ -86,7 +101,13 @@ class MockSheet {
   }
 
   getLastRow() {
-    return this.rows.length;
+    for (let r = this.rows.length - 1; r >= 0; r--) {
+      const row = this.rows[r] || [];
+      if (row.some((cell) => cell !== '' && cell !== null && cell !== undefined)) {
+        return r + 1;
+      }
+    }
+    return 0;
   }
 
   getLastColumn() {
@@ -106,6 +127,13 @@ class MockSheet {
     const idx = rowPosition - 1;
     if (idx >= 0 && idx < this.rows.length) {
       this.rows.splice(idx, 1);
+    }
+  }
+
+  deleteRows(rowPosition, howMany) {
+    const idx = rowPosition - 1;
+    if (idx >= 0 && idx < this.rows.length && howMany > 0) {
+      this.rows.splice(idx, howMany);
     }
   }
 }
@@ -263,20 +291,20 @@ function runTests() {
   assert.strictEqual(bootVazio.hasActiveEvent, false);
   assert.strictEqual(bootVazio.metadata.logos.CCB_FILE_ID, '13etuen5crQ5e66EVMRJp4cHrYWRXsREM');
   assert.strictEqual(bootVazio.metadata.logos.CNS_FILE_ID, '11cfotJKM6DCDD3HUk99kboHWLHG2v0ah');
-  console.log('✓ [1/9] doGet() padrão roteia para view=portal e expõe Logotipos CCB e CNS.');
+  console.log('✓ [1/10] doGet() padrão roteia para view=portal e expõe Logotipos CCB e CNS.');
 
   // Teste 2: Roteamento doGet para view=admin e view=checkin
   const resAdminRoute = gasGlobalContext.doGet({ parameter: { view: 'admin' } });
   assert.strictEqual(resAdminRoute.template.initialView, 'admin');
   const resCheckinRoute = gasGlobalContext.doGet({ parameter: { view: 'checkin' } });
   assert.strictEqual(resCheckinRoute.template.initialView, 'checkin');
-  console.log('✓ [2/9] Roteamento de views (portal, checkin e admin) validado.');
+  console.log('✓ [2/10] Roteamento de views (portal, checkin e admin) validado.');
 
   // Teste 3: Proteção ADMIN_SECRET
   assert.throws(() => {
     gasGlobalContext.apiAdminAuthenticateAndLoad('SenhaIncorreta');
   }, /Acesso não autorizado/);
-  console.log('✓ [3/9] Segurança ADMIN_SECRET bloqueia tentativas de acesso com chave incorreta.');
+  console.log('✓ [3/10] Segurança ADMIN_SECRET bloqueia tentativas de acesso com chave incorreta.');
 
   // Teste 4: Criação de Evento futuro com status ATIVO pelo Admin
   const futureDate = '2027-05-15';
@@ -334,7 +362,7 @@ function runTests() {
     'ATIVO',
     'ALL'
   );
-  console.log(`✓ [4/9] Evento único ATIVO e status PREVISTO validados (${idEventoCriado}).`);
+  console.log(`✓ [4/10] Evento único ATIVO e status PREVISTO validados (${idEventoCriado}).`);
 
   // Teste 5: Validação condicional (E-mail OU Telefone: pelo menos um obrigatório) e LGPD
   assert.throws(() => {
@@ -384,10 +412,14 @@ function runTests() {
   });
   assert.strictEqual(inscricaoRes2.success, true);
 
-  // Testa recuperação direta da credencial QR Code via link do WhatsApp (?credencial=UUID)
+  // Testa recuperação direta da credencial QR Code via link do WhatsApp (?credencial=UUID) + LGPD Masking
   const voucherLookup = gasGlobalContext.apiGetVoucherById(inscricaoRes1.inscricao.ID_INSCRICAO);
   assert.ok(voucherLookup && voucherLookup.inscricao);
   assert.strictEqual(voucherLookup.inscricao.ID_INSCRICAO, inscricaoRes1.inscricao.ID_INSCRICAO);
+  assert.strictEqual(voucherLookup.inscricao.EMAIL, '');
+  assert.strictEqual(voucherLookup.inscricao.TELEFONE, '');
+  assert.ok(voucherLookup.inscricao.EMAIL_MASKED.includes('***'));
+  assert.strictEqual(voucherLookup.inscricao.HAS_TELEFONE, true);
 
   const portalWithVoucher = gasGlobalContext.apiGetPortalState(
     '',
@@ -398,7 +430,8 @@ function runTests() {
     portalWithVoucher.initialVoucher.inscricao.ID_INSCRICAO,
     inscricaoRes1.inscricao.ID_INSCRICAO
   );
-  console.log('✓ [5/9] Inscrições e link direto de Credencial QR Code (WhatsApp) validados.');
+  assert.strictEqual(portalWithVoucher.initialVoucher.inscricao.EMAIL, '');
+  console.log('✓ [5/10] Inscrições, link QR Code (WhatsApp) e mascaramento LGPD validados.');
 
   // Teste 6: Bloqueio de Check-in antes da janela de 1 hora do evento e liberação dentro da janela
   assert.throws(() => {
@@ -460,9 +493,9 @@ function runTests() {
   assert.strictEqual(selfCheckinGoogle.alreadyCheckedIn, false);
   assert.strictEqual(selfCheckinGoogle.inscricao.PRESENCA_CONFIRMADA, true);
   mockLoggedGoogleEmail = '';
-  console.log('✓ [6/9] Janela de 1h antes do evento validada (bloqueio prévio + liberação no horário).');
+  console.log('✓ [6/10] Janela de 1h antes do evento validada (bloqueio prévio + liberação no horário).');
 
-  // Teste 7: Auto-Credenciamento Online informando APENAS E-mail ou APENAS Telefone
+  // Teste 7: Auto-Credenciamento Online exigindo telefone completo quando usado sozinho e aceitando 4 dígitos com E-mail
   assert.throws(() => {
     gasGlobalContext.apiSubmitOnlineSelfCheckIn({
       ID_EVENTO: idEventoCriado,
@@ -472,25 +505,35 @@ function runTests() {
     });
   }, /pelo menos um dos campos/);
 
+  assert.throws(() => {
+    gasGlobalContext.apiSubmitOnlineSelfCheckIn({
+      ID_EVENTO: idEventoCriado,
+      METHOD: 'EMAIL_PHONE',
+      EMAIL: '',
+      TELEFONE: '4321' // Apenas 4 dígitos sem e-mail deve ser bloqueado por segurança
+    });
+  }, /número completo com DDD/);
+
   const selfCheckinOnlyPhone = gasGlobalContext.apiSubmitOnlineSelfCheckIn({
     ID_EVENTO: idEventoCriado,
     METHOD: 'EMAIL_PHONE',
     EMAIL: '',
-    TELEFONE: '4321' // Informou apenas os 4 últimos dígitos do telefone de Carlos Eduardo Souza
+    TELEFONE: '19987654321'
   });
   assert.strictEqual(selfCheckinOnlyPhone.success, true);
   assert.strictEqual(selfCheckinOnlyPhone.alreadyCheckedIn, false);
   assert.strictEqual(selfCheckinOnlyPhone.inscricao.PRESENCA_CONFIRMADA, true);
+  assert.strictEqual(selfCheckinOnlyPhone.inscricao.EMAIL, '');
 
-  const selfCheckinOnlyEmail = gasGlobalContext.apiSubmitOnlineSelfCheckIn({
+  const selfCheckinEmailPlus4 = gasGlobalContext.apiSubmitOnlineSelfCheckIn({
     ID_EVENTO: idEventoCriado,
     METHOD: 'EMAIL_PHONE',
     EMAIL: 'carlos.souza@exemplo.org.br',
-    TELEFONE: '' // Informou apenas o e-mail
+    TELEFONE: '4321' // 2º fator com 4 últimos dígitos quando combinado com e-mail
   });
-  assert.strictEqual(selfCheckinOnlyEmail.success, true);
-  assert.strictEqual(selfCheckinOnlyEmail.alreadyCheckedIn, true);
-  console.log('✓ [7/9] Auto-Credenciamento Online validado com APENAS E-mail ou APENAS Telefone.');
+  assert.strictEqual(selfCheckinEmailPlus4.success, true);
+  assert.strictEqual(selfCheckinEmailPlus4.alreadyCheckedIn, true);
+  console.log('✓ [7/10] Auto-Credenciamento Online validado com proteção contra chute de 4 dígitos.');
 
   // Teste 8: Check-in via QR Code na Recepção detecta presença já confirmada
   const checkinRecepcao = gasGlobalContext.apiAdminProcessQrCheckIn(
@@ -501,7 +544,7 @@ function runTests() {
   );
   assert.strictEqual(checkinRecepcao.success, true);
   assert.strictEqual(checkinRecepcao.alreadyCheckedIn, true);
-  console.log('✓ [8/9] Terminal de Recepção integra-se em tempo real com os check-ins feitos online.');
+  console.log('✓ [8/10] Terminal de Recepção integra-se em tempo real com os check-ins feitos online.');
 
   // Teste 9: Cálculo de KPIs e séries de gráficos no Dashboard Administrativo
   const dashBundle = gasGlobalContext.apiAdminGetDashboardData(
@@ -511,9 +554,85 @@ function runTests() {
   assert.strictEqual(dashBundle.kpis.totalInscricoes, 2);
   assert.strictEqual(dashBundle.kpis.totalPresencas, 2);
   assert.strictEqual(dashBundle.kpis.taxaPresenca, 100);
-  console.log('✓ [9/9] KPIs e agregações de gráficos atualizados com 100% de precisão.\n');
+  console.log('✓ [9/10] KPIs e agregações de gráficos atualizados com 100% de precisão.');
 
-  console.log('Todos os 9 cenários de teste automatizados passaram com sucesso!');
+  // Teste 10: Deduplicação por telefone, preservação de contato, bloqueio de evento encerrado e segurança do frontend
+  const reInscricaoOnlyPhone = gasGlobalContext.apiSubmitPublicInscription({
+    ID_EVENTO: idEventoCriado,
+    NOME_COMPLETO: 'Rodrigo F. G. Lima', // Variação leve de nome, mas mesmo telefone
+    CIDADE: 'Campinas',
+    FUNCAO: 'Negociador de Suprimentos (CNS)',
+    EMAIL: '',
+    TELEFONE: '19998887766',
+    ACEITE_LGPD: true
+  });
+  assert.strictEqual(reInscricaoOnlyPhone.isDuplicate, true);
+  assert.strictEqual(reInscricaoOnlyPhone.inscricao.ID_INSCRICAO, inscricaoRes1.inscricao.ID_INSCRICAO);
+  assert.strictEqual(reInscricaoOnlyPhone.inscricao.EMAIL, 'rodrigo.lima@exemplo.org.br'); // E-mail anterior preservado
+
+  assert.throws(() => {
+    gasGlobalContext.apiAdminCreateManualInscricao(
+      mockPropertiesStore.ADMIN_SECRET,
+      {
+        ID_EVENTO: idEventoCriado,
+        NOME_COMPLETO: 'Carlos Eduardo Souza',
+        CIDADE: 'Valinhos',
+        FUNCAO: 'Diácono',
+        EMAIL: 'carlos.souza@exemplo.org.br',
+        TELEFONE: '19987654321',
+        ACEITE_LGPD: true
+      },
+      'ALL'
+    );
+  }, /já possui inscrição registrada/);
+
+  gasGlobalContext.apiAdminUpdateEventoStatus(
+    mockPropertiesStore.ADMIN_SECRET,
+    idEventoCriado,
+    'ENCERRADO',
+    'ALL'
+  );
+  assert.throws(() => {
+    gasGlobalContext.apiAdminProcessQrCheckIn(
+      mockPropertiesStore.ADMIN_SECRET,
+      inscricaoRes1.inscricao.ID_INSCRICAO,
+      idEventoCriado,
+      'ALL'
+    );
+  }, /status ENCERRADO/);
+
+  // Valida exclusão em lote de evento + inscrições vinculadas
+  const delRes = gasGlobalContext.apiAdminDeleteEvento(
+    mockPropertiesStore.ADMIN_SECRET,
+    idEventoCriado,
+    'ALL'
+  );
+  assert.strictEqual(delRes.success, true);
+  assert.strictEqual(delRes.bundle.kpis.totalInscricoes, 0);
+
+  // Auditoria estática de segurança/sintaxe no frontend AppScripts.html
+  const appScriptsHtml = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'html', 'AppScripts.html'), 'utf8');
+  const scriptMatch = appScriptsHtml.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(scriptMatch, 'Tag <script> ausente em AppScripts.html');
+  new Function(scriptMatch[1]); // Valida sintaxe JS completa
+  assert.strictEqual(
+    appScriptsHtml.split('\n').filter((l) => (l.match(/`/g) || []).length > 2).length,
+    0,
+    'Crases aninhadas detectadas em AppScripts.html'
+  );
+  assert.strictEqual(
+    [...appScriptsHtml].filter((ch) => ch.codePointAt(0) > 0xffff).length,
+    0,
+    'Caracteres astrais (>U+FFFF) detectados em AppScripts.html'
+  );
+  assert.strictEqual(
+    /\b(Environment|SecurityUtils|SpreadsheetApp|PropertiesService|Utilities)\./.test(appScriptsHtml),
+    false,
+    'Referência a símbolo exclusivo de backend detectada em AppScripts.html'
+  );
+  console.log('✓ [10/10] Deduplicação atômica, lote no Sheets e auditoria estática do frontend aprovados.\n');
+
+  console.log('Todos os 10 cenários de teste automatizados passaram com sucesso!');
 }
 
 runTests();

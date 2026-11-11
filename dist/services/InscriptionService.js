@@ -110,7 +110,64 @@ class InscriptionService {
   }
 
   /**
+   * Remove dados pessoais sensíveis em texto puro (e-mail e telefone) de retornos públicos
+   * por UUID/consulta aberta, expondo apenas versões mascaradas conforme LGPD.
+   *
+   * @param {Object} inscricao Objeto completo da inscrição.
+   * @returns {Object} Projeção segura para exibição pública.
+   * @private
+   */
+  sanitizeInscricaoForPublicDisplay_(inscricao) {
+    if (!inscricao) return null;
+    return {
+      ...inscricao,
+      EMAIL: '',
+      TELEFONE: '',
+      EMAIL_MASKED: SecurityUtils.maskEmailForDisplay(inscricao.EMAIL),
+      TELEFONE_MASKED: SecurityUtils.maskPhoneForDisplay(inscricao.TELEFONE),
+      HAS_TELEFONE: Boolean(inscricao.TELEFONE)
+    };
+  }
+
+  /**
+   * Localiza possível inscrição duplicada para o mesmo evento comparando E-mail,
+   * dígitos do Telefone (quando >= 10 dígitos) ou Nome Completo + Cidade.
+   *
+   * @param {Array<Object>} existingInscricoes Lista de inscrições do evento.
+   * @param {Object} normalized Dados normalizados da inscrição candidata.
+   * @returns {Object|null} Inscrição existente ou null.
+   */
+  findDuplicateInscricao(existingInscricoes, normalized) {
+    if (!Array.isArray(existingInscricoes) || !normalized) return null;
+
+    const targetEmail = String(normalized.EMAIL || '').trim().toLowerCase();
+    const targetPhoneDigits = SecurityUtils.extractPhoneDigits(normalized.TELEFONE || '');
+    const targetName = String(normalized.NOME_COMPLETO || '').trim().toLowerCase();
+    const targetCity = String(normalized.CIDADE || '').trim().toLowerCase();
+
+    return (
+      existingInscricoes.find((ins) => {
+        const insEmail = String(ins.EMAIL || '').trim().toLowerCase();
+        if (targetEmail && insEmail && insEmail === targetEmail) {
+          return true;
+        }
+        const insPhoneDigits = SecurityUtils.extractPhoneDigits(ins.TELEFONE || '');
+        if (targetPhoneDigits.length >= 10 && insPhoneDigits.length >= 10 && insPhoneDigits === targetPhoneDigits) {
+          return true;
+        }
+        return (
+          targetName &&
+          targetCity &&
+          String(ins.NOME_COMPLETO || '').trim().toLowerCase() === targetName &&
+          String(ins.CIDADE || '').trim().toLowerCase() === targetCity
+        );
+      }) || null
+    );
+  }
+
+  /**
    * Recupera os dados do comprovante e QR Code de uma inscrição pelo seu UUID.
+   * Por segurança LGPD, e-mail e telefone completos não são expostos em rotas públicas.
    *
    * @param {string} idInscricao UUID da inscrição.
    * @returns {Object|null} Dados do comprovante para renderização do QR Code ou null se não encontrado.
@@ -141,7 +198,7 @@ class InscriptionService {
       success: true,
       isDuplicate: false,
       message: 'Comprovante individual e QR Code carregados com sucesso.',
-      inscricao,
+      inscricao: this.sanitizeInscricaoForPublicDisplay_(inscricao),
       evento,
       qrPayload: inscricao.ID_INSCRICAO
     };
@@ -267,47 +324,46 @@ class InscriptionService {
       normalized.DATA_HORA_PRESENCA = SecurityUtils.getCurrentIsoTimestamp();
     }
 
-    const existingInscricoes = this.repository_.findInscricoesByEventoId(evento.ID_EVENTO);
-    const duplicate = existingInscricoes.find(
-      (ins) =>
-        (ins.EMAIL && ins.EMAIL.toLowerCase() === normalized.EMAIL.toLowerCase()) ||
-        (ins.NOME_COMPLETO.toLowerCase() === normalized.NOME_COMPLETO.toLowerCase() &&
-          ins.CIDADE.toLowerCase() === normalized.CIDADE.toLowerCase())
-    );
+    const txResult = this.repository_.runInTransaction(() => {
+      const existingInscricoes = this.repository_.findInscricoesByEventoId(evento.ID_EVENTO);
+      const duplicate = this.findDuplicateInscricao(existingInscricoes, normalized);
 
-    let persistedInscricao;
-    let isDuplicate = false;
-
-    if (duplicate) {
-      isDuplicate = true;
-      const updates = {
-        NOME_COMPLETO: normalized.NOME_COMPLETO,
-        CIDADE: normalized.CIDADE,
-        FUNCAO: normalized.FUNCAO,
-        EMAIL: normalized.EMAIL,
-        TELEFONE: normalized.TELEFONE,
-        ACEITE_LGPD: true
-      };
-      if (autoCheckInNow && !duplicate.PRESENCA_CONFIRMADA) {
-        updates.PRESENCA_CONFIRMADA = true;
-        updates.DATA_HORA_PRESENCA = SecurityUtils.getCurrentIsoTimestamp();
+      if (duplicate) {
+        const updates = {
+          NOME_COMPLETO: normalized.NOME_COMPLETO,
+          CIDADE: normalized.CIDADE,
+          FUNCAO: normalized.FUNCAO,
+          EMAIL: normalized.EMAIL || duplicate.EMAIL,
+          TELEFONE: normalized.TELEFONE || duplicate.TELEFONE,
+          ACEITE_LGPD: true
+        };
+        if (autoCheckInNow && !duplicate.PRESENCA_CONFIRMADA) {
+          updates.PRESENCA_CONFIRMADA = true;
+          updates.DATA_HORA_PRESENCA = SecurityUtils.getCurrentIsoTimestamp();
+        }
+        return {
+          isDuplicate: true,
+          inscricao: this.repository_.updateInscricaoById(duplicate.ID_INSCRICAO, updates)
+        };
       }
-      persistedInscricao = this.repository_.updateInscricaoById(duplicate.ID_INSCRICAO, updates);
-    } else {
-      persistedInscricao = this.repository_.insertInscricao(normalized);
-    }
+
+      return {
+        isDuplicate: false,
+        inscricao: this.repository_.insertInscricao(normalized)
+      };
+    });
 
     return {
       success: true,
-      isDuplicate,
-      message: isDuplicate
+      isDuplicate: txResult.isDuplicate,
+      message: txResult.isDuplicate
         ? 'Inscrição já localizada para esta convocação. Seu comprovante e QR Code foram atualizados e recuperados com sucesso.'
         : autoCheckInNow
         ? 'Inscrição e presença confirmadas com sucesso!'
         : 'Inscrição realizada com sucesso! Seu comprovante QR Code foi gerado.',
-      inscricao: persistedInscricao,
+      inscricao: txResult.inscricao,
       evento,
-      qrPayload: persistedInscricao.ID_INSCRICAO
+      qrPayload: txResult.inscricao.ID_INSCRICAO
     };
   }
 
@@ -491,11 +547,11 @@ class InscriptionService {
 
       if (rawPhone && phoneDigits.length < 4) {
         throw new Error(
-          'Informe o telefone completo ou ao menos os 4 últimos dígitos do celular.'
+          'Informe o telefone completo ou ao menos os 4 últimos dígitos quando combinado com o e-mail.'
         );
       }
 
-      // Caso tenha informado E-mail e Telefone simultaneamente
+      // Caso tenha informado E-mail e Telefone simultaneamente (aceita os 4 últimos dígitos como 2º fator)
       if (rawEmail && phoneDigits) {
         const candidateByEmail = inscricoesEvento.find(
           (ins) => ins.EMAIL && ins.EMAIL.trim().toLowerCase() === rawEmail
@@ -525,7 +581,12 @@ class InscriptionService {
           );
         }
       } else {
-        // Informou apenas o Telefone
+        // Informou apenas o Telefone: exige telefone completo com DDD (10 ou 11 dígitos) por segurança LGPD
+        if (phoneDigits.length < 10) {
+          throw new Error(
+            'Para validar apenas por telefone, informe o número completo com DDD (10 ou 11 dígitos).'
+          );
+        }
         matchedInscricao = inscricoesEvento.find(
           (ins) =>
             ins.TELEFONE && SecurityUtils.matchesPhoneVerification(ins.TELEFONE, rawPhone)
@@ -543,7 +604,7 @@ class InscriptionService {
         success: true,
         alreadyCheckedIn: true,
         message: `Sua presença já está confirmada nesta reunião desde ${matchedInscricao.DATA_HORA_PRESENCA}.`,
-        inscricao: matchedInscricao,
+        inscricao: this.sanitizeInscricaoForPublicDisplay_(matchedInscricao),
         evento,
         qrPayload: matchedInscricao.ID_INSCRICAO
       };
@@ -558,7 +619,7 @@ class InscriptionService {
       success: true,
       alreadyCheckedIn: false,
       message: `A Paz de Deus, ${updated.NOME_COMPLETO}! Sua presença foi confirmada com sucesso no evento.`,
-      inscricao: updated,
+      inscricao: this.sanitizeInscricaoForPublicDisplay_(updated),
       evento,
       qrPayload: updated.ID_INSCRICAO
     };

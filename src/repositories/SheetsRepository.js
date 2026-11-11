@@ -11,6 +11,10 @@ class SheetsRepository {
   constructor() {
     /** @private @type {GoogleAppsScript.Spreadsheet.Spreadsheet|null} */
     this.spreadsheet_ = null;
+    /** @private @type {Object<string, GoogleAppsScript.Spreadsheet.Sheet>} */
+    this.verifiedTables_ = {};
+    /** @private @type {number} */
+    this.lockDepth_ = 0;
   }
 
   /**
@@ -50,8 +54,27 @@ class SheetsRepository {
    * @private
    */
   ensureTable_(sheetName, columns) {
+    if (this.verifiedTables_[sheetName]) {
+      return this.verifiedTables_[sheetName];
+    }
+
     const ss = this.getSpreadsheet_();
     let sheet = ss.getSheetByName(sheetName);
+    const cacheKey = `schema_v2_${sheetName}_${columns.length}`;
+
+    if (sheet && sheet.getLastRow() >= 1) {
+      try {
+        if (typeof CacheService !== 'undefined' && CacheService.getScriptCache) {
+          const cached = CacheService.getScriptCache().get(cacheKey);
+          if (cached === '1') {
+            this.verifiedTables_[sheetName] = sheet;
+            return sheet;
+          }
+        }
+      } catch (_) {
+        // Ignora indisponibilidade de CacheService em mocks/testes
+      }
+    }
 
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
@@ -96,17 +119,48 @@ class SheetsRepository {
       }
     }
 
+    try {
+      if (typeof CacheService !== 'undefined' && CacheService.getScriptCache) {
+        CacheService.getScriptCache().put(cacheKey, '1', 600);
+      }
+    } catch (_) {
+      // Ignora indisponibilidade de CacheService em mocks/testes
+    }
+
+    this.verifiedTables_[sheetName] = sheet;
     return sheet;
   }
 
   /**
+   * Executa um bloco lógico completo dentro de uma transação protegida por LockService.
+   * Permite leitura + escrita atômicas sem condições de corrida (TOCTOU).
+   *
+   * @template T
+   * @param {function(): T} callback Operação atômica a executar.
+   * @returns {T} Resultado retornado pelo callback.
+   */
+  runInTransaction(callback) {
+    return this.withWriteLock_(callback);
+  }
+
+  /**
    * Executa uma operação de escrita protegida por LockService para evitar condições de corrida.
+   * Suporta reentrância no mesmo contexto de execução.
    * @template T
    * @param {function(): T} callback Função crítica a ser executada.
    * @returns {T} Resultado do callback.
    * @private
    */
   withWriteLock_(callback) {
+    if (this.lockDepth_ > 0) {
+      this.lockDepth_ += 1;
+      try {
+        return callback();
+      } finally {
+        this.lockDepth_ -= 1;
+      }
+    }
+
     const lock = LockService.getScriptLock();
     const hasLock = lock.tryLock(15000);
     if (!hasLock) {
@@ -114,11 +168,13 @@ class SheetsRepository {
         'O banco de dados está processando outra atualização simultânea. Por favor, tente novamente em instantes.'
       );
     }
+    this.lockDepth_ = 1;
     try {
       const result = callback();
       SpreadsheetApp.flush();
       return result;
     } finally {
+      this.lockDepth_ = 0;
       lock.releaseLock();
     }
   }
@@ -380,11 +436,42 @@ class SheetsRepository {
         );
         const lastRowIns = sheetInscricoes.getLastRow();
         if (lastRowIns > 1) {
-          const eventFkValues = sheetInscricoes.getRange(2, 2, lastRowIns - 1, 1).getValues();
-          for (let j = eventFkValues.length - 1; j >= 0; j--) {
-            if (String(eventFkValues[j][0] || '').trim().toLowerCase() === targetId) {
-              sheetInscricoes.deleteRow(j + 2);
-              deletedInscricoesCount++;
+          const numColsIns = Environment.TABLES.INSCRICOES.COLUMNS.length;
+          const totalDataRows = lastRowIns - 1;
+          const allInsRows = sheetInscricoes.getRange(2, 1, totalDataRows, numColsIns).getValues();
+          const keptRows = [];
+
+          for (let j = 0; j < allInsRows.length; j++) {
+            if (String(allInsRows[j][1] || '').trim().toLowerCase() === targetId) {
+              deletedInscricoesCount += 1;
+            } else {
+              keptRows.push(allInsRows[j]);
+            }
+          }
+
+          if (deletedInscricoesCount > 0) {
+            sheetInscricoes.getRange(2, 1, totalDataRows, numColsIns).clearContent();
+            if (keptRows.length > 0) {
+              const formats = keptRows.map(() => [
+                '@',
+                '@',
+                '@',
+                '@',
+                '@',
+                '@',
+                '@',
+                'General',
+                '@',
+                'General',
+                '@'
+              ]);
+              const writeRange = sheetInscricoes.getRange(2, 1, keptRows.length, numColsIns);
+              writeRange.setNumberFormats(formats);
+              writeRange.setValues(keptRows);
+            }
+            const trailingRows = totalDataRows - keptRows.length;
+            if (trailingRows > 0 && typeof sheetInscricoes.deleteRows === 'function') {
+              sheetInscricoes.deleteRows(keptRows.length + 2, trailingRows);
             }
           }
         }
@@ -482,10 +569,11 @@ class SheetsRepository {
 
       const rowValues = this.mapInscricaoToRow_(novaInscricao);
       const nextRow = sheet.getLastRow() + 1;
-      sheet.getRange(nextRow, 1, 1, 7).setNumberFormat('@');
-      sheet.getRange(nextRow, 9, 1, 1).setNumberFormat('@');
-      sheet.getRange(nextRow, 11, 1, 1).setNumberFormat('@');
-      sheet.getRange(nextRow, 1, 1, rowValues.length).setValues([rowValues]);
+      const targetRange = sheet.getRange(nextRow, 1, 1, rowValues.length);
+      targetRange.setNumberFormats([
+        ['@', '@', '@', '@', '@', '@', '@', 'General', '@', 'General', '@']
+      ]);
+      targetRange.setValues([rowValues]);
 
       return novaInscricao;
     });
@@ -543,10 +631,11 @@ class SheetsRepository {
 
           const rowNumber = i + 2;
           const rowValues = this.mapInscricaoToRow_(updatedInscricao);
-          sheet.getRange(rowNumber, 1, 1, 7).setNumberFormat('@');
-          sheet.getRange(rowNumber, 9, 1, 1).setNumberFormat('@');
-          sheet.getRange(rowNumber, 11, 1, 1).setNumberFormat('@');
-          sheet.getRange(rowNumber, 1, 1, numCols).setValues([rowValues]);
+          const targetRange = sheet.getRange(rowNumber, 1, 1, numCols);
+          targetRange.setNumberFormats([
+            ['@', '@', '@', '@', '@', '@', '@', 'General', '@', 'General', '@']
+          ]);
+          targetRange.setValues([rowValues]);
 
           return updatedInscricao;
         }

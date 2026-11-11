@@ -13,6 +13,7 @@
       currentView: ['admin', 'checkin'].includes(window.__INITIAL_VIEW__)
         ? window.__INITIAL_VIEW__
         : 'portal',
+      serverClockOffsetMs: 0,
       portal: {
         hasActiveEvent: false,
         activeEvent: null,
@@ -621,8 +622,32 @@
     }
 
     /**
+     * Calcula a diferença (ms) entre o relógio do servidor (America/Sao_Paulo) e o navegador
+     * para garantir precisão na contagem regressiva do check-in mesmo com relógios locais incorretos.
+     * @param {Object} metadata Metadados retornados pelo backend.
+     */
+    function syncServerClockOffset(metadata) {
+      if (!metadata || !metadata.serverNowIso) return;
+      const serverMs = Date.parse(metadata.serverNowIso);
+      if (!isNaN(serverMs)) {
+        AppState.serverClockOffsetMs = serverMs - Date.now();
+      }
+    }
+
+    /**
+     * Retorna a data corrente (YYYY-MM-DD) no fuso horário de São Paulo sincronizada com o servidor.
+     * @returns {string} Data ISO YYYY-MM-DD.
+     */
+    function getServerTodayIso() {
+      const approxNow = new Date(Date.now() + (AppState.serverClockOffsetMs || 0));
+      // Ajusta para UTC-3 (America/Sao_Paulo) para evitar virada antecipada de dia em UTC
+      const spTime = new Date(approxNow.getTime() - 3 * 60 * 60 * 1000);
+      return spTime.toISOString().slice(0, 10);
+    }
+
+    /**
      * Avalia no cliente se a janela de check-in (1 hora antes do início do evento)
-     * já está liberada, mantendo sincronia com a regra do backend.
+     * já está liberada, mantendo sincronia com o relógio oficial do backend.
      * @param {Object} ev Objeto de evento.
      * @returns {{isOpen: boolean, releaseDateBr: string, releaseTime: string, lockMessage: string}}
      */
@@ -633,6 +658,15 @@
           releaseDateBr: '—',
           releaseTime: '—',
           lockMessage: 'Nenhuma reunião selecionada.'
+        };
+      }
+
+      if (ev.STATUS && ev.STATUS !== 'ATIVO') {
+        return {
+          isOpen: false,
+          releaseDateBr: formatDateBr(ev.DATA_EVENTO),
+          releaseTime: ev.HORA_EVENTO || '—',
+          lockMessage: `Esta reunião encontra-se com status ${ev.STATUS}. O credenciamento não está aberto.`
         };
       }
 
@@ -656,13 +690,15 @@
       const eventWallMs = Date.UTC(evY, evM - 1, evD, evH, evMin, 0);
       const releaseWallMs = eventWallMs - 60 * 60 * 1000;
 
-      const now = new Date();
+      // Usa relógio oficial sincronizado do servidor em America/Sao_Paulo (UTC-3)
+      const approxNowMs = Date.now() + (AppState.serverClockOffsetMs || 0);
+      const spNow = new Date(approxNowMs - 3 * 60 * 60 * 1000);
       const nowWallMs = Date.UTC(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        now.getHours(),
-        now.getMinutes(),
+        spNow.getUTCFullYear(),
+        spNow.getUTCMonth(),
+        spNow.getUTCDate(),
+        spNow.getUTCHours(),
+        spNow.getUTCMinutes(),
         0
       );
 
@@ -932,6 +968,7 @@
         AppState.portal.googleSessionMatch = state.googleSessionMatch || null;
         if (state.metadata) {
           AppState.portal.metadata = state.metadata;
+          syncServerClockOffset(state.metadata);
           populateStaticSelectOptions();
         }
         AppState.portal.lastVoucher = null;
@@ -1404,13 +1441,13 @@
       } else {
         telefone = phoneEl ? phoneEl.value.trim() : '';
         const digits = telefone.replace(/\D/g, '');
-        if (digits.length < 4) {
+        if (digits.length < 10) {
           if (wrapPhone) wrapPhone.classList.add('has-error');
           if (phoneEl) {
             phoneEl.setAttribute('aria-invalid', 'true');
             phoneEl.focus();
           }
-          toastr.warning('Informe o telefone cadastrado ou os 4 últimos dígitos.');
+          toastr.warning('Informe o telefone/celular completo com DDD (10 ou 11 dígitos).');
           return;
         }
         if (wrapPhone) wrapPhone.classList.remove('has-error');
@@ -1537,9 +1574,10 @@
       AppState.admin.filterEventoId = bundle.filterEventoId || 'ALL';
       if (bundle.metadata) {
         AppState.portal.metadata = bundle.metadata;
+        syncServerClockOffset(bundle.metadata);
       }
 
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayIso = getServerTodayIso();
       const activeList = (bundle.eventos || []).filter(
         (ev) => ev.STATUS === 'ATIVO' && ev.DATA_EVENTO >= todayIso
       );
@@ -1552,6 +1590,107 @@
       renderDashboardCharts(bundle);
       renderEventosTable(bundle.eventos || []);
       renderInscricoesTable();
+    }
+
+    /**
+     * Aplica uma atualização pontual (delta) de uma única inscrição no bundle em memória,
+     * recalculando KPIs, gráficos e tabelas sem precisar rebaixar todo o histórico do Sheets.
+     *
+     * @param {Object} updatedInscricao Objeto atualizado da inscrição retornado pelo backend.
+     */
+    function applyInscricaoDeltaToBundle(updatedInscricao) {
+      const bundle = AppState.admin.bundle;
+      if (!bundle || !updatedInscricao || !updatedInscricao.ID_INSCRICAO) return;
+
+      const targetId = updatedInscricao.ID_INSCRICAO.toLowerCase();
+      const list = bundle.inscricoes || [];
+      const existingIdx = list.findIndex(
+        (item) => String(item.ID_INSCRICAO || '').toLowerCase() === targetId
+      );
+
+      if (existingIdx >= 0) {
+        list[existingIdx] = {
+          ...list[existingIdx],
+          ...updatedInscricao
+        };
+      } else {
+        const ev = (bundle.eventos || []).find(
+          (e) => String(e.ID_EVENTO || '').toLowerCase() === String(updatedInscricao.ID_EVENTO || '').toLowerCase()
+        );
+        list.push({
+          ...updatedInscricao,
+          EVENTO_TITULO: ev ? ev.TITULO : 'Evento',
+          EVENTO_DATA: ev ? ev.DATA_EVENTO : '',
+          EVENTO_HORA: ev ? ev.HORA_EVENTO : '',
+          EVENTO_LOCAL: ev ? ev.LOCAL : ''
+        });
+      }
+
+      const filterId = String(bundle.filterEventoId || AppState.admin.filterEventoId || 'ALL').toLowerCase();
+      const filtradas =
+        filterId === 'all'
+          ? list.slice()
+          : list.filter((ins) => String(ins.ID_EVENTO || '').toLowerCase() === filterId);
+      bundle.inscricoesFiltradas = filtradas;
+
+      const totalInscricoes = filtradas.length;
+      const totalPresencas = filtradas.filter((ins) => Boolean(ins.PRESENCA_CONFIRMADA)).length;
+      const taxaPresenca =
+        totalInscricoes > 0 ? Number(((totalPresencas / totalInscricoes) * 100).toFixed(1)) : 0;
+
+      bundle.kpis = {
+        ...(bundle.kpis || {}),
+        totalInscricoes,
+        totalPresencas,
+        taxaPresenca,
+        totalReunioes: (bundle.eventos || []).length
+      };
+
+      // Atualiza contagens por evento
+      const statsPorEv = {};
+      list.forEach((ins) => {
+        const k = String(ins.ID_EVENTO || '').toLowerCase();
+        if (!statsPorEv[k]) statsPorEv[k] = { ins: 0, pres: 0 };
+        statsPorEv[k].ins += 1;
+        if (ins.PRESENCA_CONFIRMADA) statsPorEv[k].pres += 1;
+      });
+      (bundle.eventos || []).forEach((ev) => {
+        const st = statsPorEv[String(ev.ID_EVENTO || '').toLowerCase()] || { ins: 0, pres: 0 };
+        ev.TOTAL_INSCRITOS = st.ins;
+        ev.TOTAL_PRESENTES = st.pres;
+      });
+
+      // Atualiza séries dos gráficos
+      const cidadesOrder = (AppState.portal.metadata && AppState.portal.metadata.cidades) || [];
+      const cidadesMap = new Map();
+      cidadesOrder.forEach((c) => cidadesMap.set(c, { ins: 0, pres: 0 }));
+      const funcoesMap = new Map();
+
+      filtradas.forEach((ins) => {
+        const cKey = cidadesOrder.includes(ins.CIDADE) ? ins.CIDADE : ins.CIDADE || 'Outros';
+        if (!cidadesMap.has(cKey)) cidadesMap.set(cKey, { ins: 0, pres: 0 });
+        const cEntry = cidadesMap.get(cKey);
+        cEntry.ins += 1;
+        if (ins.PRESENCA_CONFIRMADA) cEntry.pres += 1;
+
+        const fnKey = ins.FUNCAO || 'Não Informado';
+        funcoesMap.set(fnKey, (funcoesMap.get(fnKey) || 0) + 1);
+      });
+
+      const funcoesEntries = Array.from(funcoesMap.entries()).sort((a, b) => b[1] - a[1]);
+      bundle.charts = {
+        cidades: {
+          labels: Array.from(cidadesMap.keys()),
+          inscritos: Array.from(cidadesMap.values()).map((v) => v.ins),
+          presentes: Array.from(cidadesMap.values()).map((v) => v.pres)
+        },
+        funcoes: {
+          labels: funcoesEntries.map((e) => e[0]),
+          valores: funcoesEntries.map((e) => e[1])
+        }
+      };
+
+      applyAdminBundle(bundle);
     }
 
     /**
@@ -2365,12 +2504,21 @@
 
       const bundle = AppState.admin.bundle;
       const wb = XLSX.utils.book_new();
+      const logosMeta = (AppState.portal.metadata && AppState.portal.metadata.logos) || {};
 
       const kpiRows = [
         ['CONGREGAÇÃO CRISTÃ NO BRASIL (CCB) - REGIONAL CAMPINAS/SP'],
         ['COMISSÃO DE NEGOCIADORES DE SUPRIMENTOS (CNS) - RELATÓRIO OFICIAL'],
-        ['Logotipo CCB (Drive)', Environment.LOGOS ? Environment.LOGOS.CCB_PRIMARY_URL : 'https://drive.google.com/file/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM/view'],
-        ['Logotipo CNS (Drive)', Environment.LOGOS ? Environment.LOGOS.CNS_PRIMARY_URL : 'https://drive.google.com/file/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah/view'],
+        [
+          'Logotipo CCB (Drive)',
+          logosMeta.CCB_PRIMARY_URL ||
+            'https://drive.google.com/file/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM/view'
+        ],
+        [
+          'Logotipo CNS (Drive)',
+          logosMeta.CNS_PRIMARY_URL ||
+            'https://drive.google.com/file/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah/view'
+        ],
         ['Data de Geração', formatTimestampBr(bundle.generatedAt)],
         ['Escopo do Filtro', bundle.filterEventoId === 'ALL' ? 'Consolidado Histórico' : bundle.filterEventoId],
         [],
@@ -2465,6 +2613,7 @@
         HORA_EVENTO: ev.HORA_EVENTO,
         HORA_LANCHE: ev.HORA_LANCHE,
         LOCAL: ev.LOCAL,
+        LINK_MAPA: resolveEventMapUrl(ev),
         STATUS: ev.STATUS,
         INSCRITOS: ev.TOTAL_INSCRITOS || 0,
         PRESENTES: ev.TOTAL_PRESENTES || 0
@@ -2474,6 +2623,37 @@
         eventosExport.length > 0 ? eventosExport : [{ AVISO: 'Nenhuma reunião cadastrada.' }]
       );
       XLSX.utils.book_append_sheet(wb, wsEventos, 'Eventos');
+
+      // Aba consolidada mensal (Jan-Dez do ano selecionado)
+      const selectedYear =
+        AppState.admin.selectedAnnualYear && AppState.admin.selectedAnnualYear !== 'ALL_YEARS'
+          ? AppState.admin.selectedAnnualYear
+          : String(new Date().getFullYear());
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const anualStats = monthNames.map((mes) => ({ MES: `${mes}/${selectedYear}`, REUNIOES: 0, INSCRITOS: 0, PRESENTES: 0, AUSENTES: 0 }));
+
+      (bundle.eventos || []).forEach((ev) => {
+        const d = String(ev.DATA_EVENTO || '').trim();
+        if (d.startsWith(selectedYear + '-')) {
+          const mIdx = parseInt(d.slice(5, 7), 10) - 1;
+          if (mIdx >= 0 && mIdx < 12) anualStats[mIdx].REUNIOES += 1;
+        }
+      });
+      (bundle.inscricoes || []).forEach((ins) => {
+        const d = String(ins.EVENTO_DATA || '').trim();
+        if (d.startsWith(selectedYear + '-')) {
+          const mIdx = parseInt(d.slice(5, 7), 10) - 1;
+          if (mIdx >= 0 && mIdx < 12) {
+            anualStats[mIdx].INSCRITOS += 1;
+            if (ins.PRESENCA_CONFIRMADA) anualStats[mIdx].PRESENTES += 1;
+          }
+        }
+      });
+      anualStats.forEach((st) => {
+        st.AUSENTES = Math.max(0, st.INSCRITOS - st.PRESENTES);
+      });
+      const wsAnual = XLSX.utils.json_to_sheet(anualStats);
+      XLSX.utils.book_append_sheet(wb, wsAnual, 'Evolucao_Anual');
 
       const fileDate = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `Relatorio_Agenda_CNS_Campinas_${fileDate}.xlsx`);
@@ -3240,7 +3420,11 @@
           nextState,
           AppState.admin.filterEventoId
         );
-        applyAdminBundle(response.bundle);
+        if (response.bundle) {
+          applyAdminBundle(response.bundle);
+        } else if (response.inscricao) {
+          applyInscricaoDeltaToBundle(response.inscricao);
+        }
         toastr.success(response.message);
       } catch (err) {
         toastr.error(err.message);
@@ -3486,7 +3670,11 @@
           AppState.admin.filterEventoId
         );
 
-        applyAdminBundle(response.bundle);
+        if (response.bundle) {
+          applyAdminBundle(response.bundle);
+        } else if (response.inscricao) {
+          applyInscricaoDeltaToBundle(response.inscricao);
+        }
         const ins = response.inscricao;
 
         if (response.alreadyCheckedIn) {
@@ -3691,8 +3879,8 @@
         }
       });
 
-      // Máscara de telefone nos inputs de inscrição completa
-      ['pub-telefone', 'man-telefone'].forEach((id) => {
+      // Máscara de telefone nos inputs de inscrição completa e auto check-in
+      ['pub-telefone', 'man-telefone', 'sc-telefone'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) {
           el.addEventListener('input', (e) => {
@@ -4108,6 +4296,7 @@
 
       if (boot.metadata) {
         AppState.portal.metadata = boot.metadata;
+        syncServerClockOffset(boot.metadata);
       }
       AppState.portal.hasActiveEvent = Boolean(boot.hasActiveEvent);
       AppState.portal.activeEvent = boot.activeEvent || null;

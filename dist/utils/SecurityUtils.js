@@ -226,6 +226,24 @@ const SecurityUtils = (() => {
   }
 
   /**
+   * Mascara um número de telefone para exibição pública segura (LGPD).
+   * Exemplo: "(19) 99888-7766" -> "(19) *****-7766".
+   * @param {string} phone Telefone completo.
+   * @returns {string} Telefone mascarado.
+   */
+  function maskPhoneForDisplay(phone) {
+    const digits = extractPhoneDigits(phone);
+    if (!digits || digits.length < 4) return '';
+    const last4 = digits.slice(-4);
+    if (digits.length >= 10) {
+      const ddd = digits.slice(0, 2);
+      const maskMid = digits.length === 11 ? '*****' : '****';
+      return `(${ddd}) ${maskMid}-${last4}`;
+    }
+    return `***-${last4}`;
+  }
+
+  /**
    * Retorna o timestamp atual no padrão ISO 8601 com offset do fuso horário configurado.
    * @returns {string} Exemplo: "2026-11-10T09:30:00-03:00".
    */
@@ -437,6 +455,7 @@ const SecurityUtils = (() => {
     sanitizePhone,
     matchesPhoneVerification,
     maskEmailForDisplay,
+    maskPhoneForDisplay,
     getCurrentIsoTimestamp,
     getTodayDateString,
     getCurrentTimeString,
