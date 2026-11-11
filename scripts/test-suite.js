@@ -510,45 +510,42 @@ function runTests() {
   mockLoggedGoogleEmail = '';
   console.log('✓ [6/10] Janela de 1h antes do evento validada (bloqueio prévio + liberação no horário).');
 
-  // Teste 7: Auto-Credenciamento Online exigindo telefone completo quando usado sozinho e aceitando 4 dígitos com E-mail
+  // Teste 7: Check-in manual online exclusivo por telefone higienizado (+55, 0XX, máscara) e proteção contra número incompleto
   assert.throws(() => {
     gasGlobalContext.apiSubmitOnlineSelfCheckIn({
       ID_EVENTO: idEventoCriado,
-      METHOD: 'EMAIL_PHONE',
-      EMAIL: '',
+      METHOD: 'PHONE',
+      EMAIL: 'carlos.souza@exemplo.org.br',
       TELEFONE: ''
     });
-  }, /pelo menos um dos campos/);
+  }, /número completo de Telefone \/ Celular com DDD/);
 
   assert.throws(() => {
     gasGlobalContext.apiSubmitOnlineSelfCheckIn({
       ID_EVENTO: idEventoCriado,
-      METHOD: 'EMAIL_PHONE',
-      EMAIL: '',
-      TELEFONE: '4321' // Apenas 4 dígitos sem e-mail deve ser bloqueado por segurança
+      METHOD: 'PHONE',
+      TELEFONE: '4321' // Menos de 10 dígitos deve ser bloqueado por segurança
     });
-  }, /número completo com DDD/);
+  }, /número completo de Telefone \/ Celular com DDD/);
 
   const selfCheckinOnlyPhone = gasGlobalContext.apiSubmitOnlineSelfCheckIn({
     ID_EVENTO: idEventoCriado,
-    METHOD: 'EMAIL_PHONE',
-    EMAIL: '',
-    TELEFONE: '19987654321'
+    METHOD: 'PHONE',
+    TELEFONE: '+55 (19) 98765-4321' // Higieniza +55, espaços e máscara antes de comparar
   });
   assert.strictEqual(selfCheckinOnlyPhone.success, true);
   assert.strictEqual(selfCheckinOnlyPhone.alreadyCheckedIn, false);
   assert.strictEqual(selfCheckinOnlyPhone.inscricao.PRESENCA_CONFIRMADA, true);
   assert.strictEqual(selfCheckinOnlyPhone.inscricao.EMAIL, '');
 
-  const selfCheckinEmailPlus4 = gasGlobalContext.apiSubmitOnlineSelfCheckIn({
+  const selfCheckinZeroPrefixPhone = gasGlobalContext.apiSubmitOnlineSelfCheckIn({
     ID_EVENTO: idEventoCriado,
-    METHOD: 'EMAIL_PHONE',
-    EMAIL: 'carlos.souza@exemplo.org.br',
-    TELEFONE: '4321' // 2º fator com 4 últimos dígitos quando combinado com e-mail
+    METHOD: 'PHONE',
+    TELEFONE: '019 98765-4321' // Higieniza prefixo 0 antes do DDD
   });
-  assert.strictEqual(selfCheckinEmailPlus4.success, true);
-  assert.strictEqual(selfCheckinEmailPlus4.alreadyCheckedIn, true);
-  console.log('✓ [7/10] Auto-Credenciamento Online validado com proteção contra chute de 4 dígitos.');
+  assert.strictEqual(selfCheckinZeroPrefixPhone.success, true);
+  assert.strictEqual(selfCheckinZeroPrefixPhone.alreadyCheckedIn, true);
+  console.log('✓ [7/10] Check-in manual por telefone higienizado e auto-checkin Google validados.');
 
   // Teste 8: Check-in via QR Code na Recepção detecta presença já confirmada
   const checkinRecepcao = gasGlobalContext.apiAdminProcessQrCheckIn(

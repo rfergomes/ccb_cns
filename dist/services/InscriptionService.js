@@ -522,7 +522,7 @@ class InscriptionService {
       );
     }
 
-    const method = String(checkInPayload.METHOD || checkInPayload.method || 'EMAIL_PHONE')
+    const method = String(checkInPayload.METHOD || checkInPayload.method || 'PHONE')
       .trim()
       .toUpperCase();
 
@@ -532,7 +532,7 @@ class InscriptionService {
       const activeEmail = Environment.getActiveGoogleUserEmail();
       if (!activeEmail) {
         throw new Error(
-          'Sua conta Google não pôde ser detectada automaticamente. Utilize a confirmação por E-mail e Telefone.'
+          'Sua conta Google não pôde ser detectada automaticamente. Utilize a confirmação pelo Telefone cadastrado.'
         );
       }
       matchedInscricao = inscricoesEvento.find(
@@ -540,7 +540,7 @@ class InscriptionService {
       );
       if (!matchedInscricao) {
         throw new Error(
-          `Nenhuma inscrição encontrada nesta reunião para a conta Google "${activeEmail}". Confirme informando o e-mail e telefone utilizados na inscrição.`
+          `Nenhuma inscrição encontrada nesta reunião para a conta Google "${activeEmail}". Confirme informando o telefone utilizado na inscrição.`
         );
       }
     } else if (method === 'DEVICE_CREDENTIAL') {
@@ -548,85 +548,35 @@ class InscriptionService {
         checkInPayload.ID_INSCRICAO || checkInPayload.idInscricao || ''
       ).trim();
       if (!SecurityUtils.isValidUuid(idInscricao)) {
-        throw new Error('Credencial local inválida. Utilize a confirmação por E-mail e Telefone.');
+        throw new Error('Credencial local inválida. Utilize a confirmação pelo Telefone cadastrado.');
       }
       matchedInscricao = inscricoesEvento.find(
         (ins) => ins.ID_INSCRICAO.toLowerCase() === idInscricao.toLowerCase()
       );
       if (!matchedInscricao) {
         throw new Error(
-          'Credencial não localizada para esta reunião. Utilize a confirmação por E-mail e Telefone.'
+          'Credencial não localizada para esta reunião. Utilize a confirmação pelo Telefone cadastrado.'
         );
       }
     } else {
-      // Validação flexível: E-mail OU Telefone (pelo menos um campo deve ser preenchido)
-      const rawEmail = String(checkInPayload.EMAIL || checkInPayload.email || '')
-        .trim()
-        .toLowerCase();
+      // Check-in manual exclusivamente por Telefone higienizado com DDD (10 ou 11 dígitos)
       const rawPhone = String(checkInPayload.TELEFONE || checkInPayload.telefone || '').trim();
-      const phoneDigits = SecurityUtils.extractPhoneDigits(rawPhone);
+      const phoneDigits = SecurityUtils.normalizePhoneDigits(rawPhone);
 
-      if (!rawEmail && !phoneDigits) {
+      if (!phoneDigits || phoneDigits.length < 10 || phoneDigits.length > 11) {
         throw new Error(
-          'Informe pelo menos um dos campos (E-mail ou Telefone da inscrição) para confirmar sua presença.'
+          'Para validar o check-in manual, informe o número completo de Telefone / Celular com DDD (10 ou 11 dígitos).'
         );
       }
 
-      if (rawEmail && !rawEmail.includes('@')) {
-        throw new Error('O endereço de e-mail informado possui um formato inválido.');
-      }
-
-      if (rawPhone && phoneDigits.length < 4) {
+      matchedInscricao = inscricoesEvento.find(
+        (ins) =>
+          ins.TELEFONE && SecurityUtils.normalizePhoneDigits(ins.TELEFONE) === phoneDigits
+      );
+      if (!matchedInscricao) {
         throw new Error(
-          'Informe o telefone completo ou ao menos os 4 últimos dígitos quando combinado com o e-mail.'
+          'Não foi encontrada inscrição para este número de telefone na reunião ativa. Verifique o DDD e os dígitos informados.'
         );
-      }
-
-      // Caso tenha informado E-mail e Telefone simultaneamente (aceita os 4 últimos dígitos como 2º fator)
-      if (rawEmail && phoneDigits) {
-        const candidateByEmail = inscricoesEvento.find(
-          (ins) => ins.EMAIL && ins.EMAIL.trim().toLowerCase() === rawEmail
-        );
-        if (!candidateByEmail) {
-          throw new Error(
-            'Não foi encontrada inscrição para este endereço de e-mail na reunião ativa.'
-          );
-        }
-        if (
-          candidateByEmail.TELEFONE &&
-          !SecurityUtils.matchesPhoneVerification(candidateByEmail.TELEFONE, rawPhone)
-        ) {
-          throw new Error(
-            'O telefone informado não confere com o cadastro deste e-mail.'
-          );
-        }
-        matchedInscricao = candidateByEmail;
-      } else if (rawEmail) {
-        // Informou apenas o E-mail
-        matchedInscricao = inscricoesEvento.find(
-          (ins) => ins.EMAIL && ins.EMAIL.trim().toLowerCase() === rawEmail
-        );
-        if (!matchedInscricao) {
-          throw new Error(
-            'Não foi encontrada inscrição para este endereço de e-mail na reunião ativa. Verifique a digitação ou tente pelo Telefone.'
-          );
-        }
-      } else {
-        // Informou apenas o Telefone: exige telefone completo com DDD (10 ou 11 dígitos) por segurança LGPD
-        if (phoneDigits.length < 10) {
-          throw new Error(
-            'Para validar apenas por telefone, informe o número completo com DDD (10 ou 11 dígitos).'
-          );
-        }
-        matchedInscricao = inscricoesEvento.find(
-          (ins) =>
-            ins.TELEFONE && SecurityUtils.matchesPhoneVerification(ins.TELEFONE, rawPhone)
-        );
-        if (!matchedInscricao) {
-          throw new Error(
-            'Não foi encontrada inscrição para este número de telefone na reunião ativa. Verifique os dígitos ou tente pelo E-mail.'
-          );
-        }
       }
     }
 

@@ -342,6 +342,23 @@
     })();
 
     /**
+     * Higieniza um número de telefone brasileiro extraindo apenas dígitos
+     * e removendo DDI +55 ou prefixo 0 antes do DDD.
+     * @param {string} value Valor informado.
+     * @returns {string} Dígitos higienizados.
+     */
+    function normalizePhoneDigitsClient(value) {
+      let digits = String(value || '').replace(/\D/g, '');
+      if (digits.length >= 12 && digits.startsWith('55')) {
+        digits = digits.slice(2);
+      }
+      while (digits.length >= 11 && digits.startsWith('0')) {
+        digits = digits.slice(1);
+      }
+      return digits;
+    }
+
+    /**
      * Valida pares de campos onde pelo menos um (E-mail OU Telefone) deve ser preenchido.
      * Se um deles estiver preenchido corretamente, o outro torna-se opcional.
      *
@@ -357,7 +374,7 @@
 
       const emailVal = emailEl.value.trim();
       const phoneVal = phoneEl.value.trim();
-      const phoneDigits = phoneVal.replace(/\D/g, '');
+      const phoneDigits = normalizePhoneDigitsClient(phoneVal);
 
       const emailWrap = emailEl.closest('.col-md-5, .col-md-6, .col-md-7, .col-12');
       const phoneWrap = phoneEl.closest('.col-md-5, .col-md-6, .col-md-7, .col-12');
@@ -540,13 +557,11 @@
 
       populateDynamicFuncaoSelects();
 
-      // Se houver e-mail de Conta Google detectado na sessão, pré-preenche nos campos de e-mail
+      // Se houver e-mail de Conta Google detectado na sessão, pré-preenche no formulário de inscrição
       const detectedEmail = AppState.portal.metadata && AppState.portal.metadata.detectedGoogleEmail;
       if (detectedEmail) {
         const pubEmail = document.getElementById('pub-email');
         if (pubEmail && !pubEmail.value) pubEmail.value = detectedEmail;
-        const scEmail = document.getElementById('sc-email');
-        if (scEmail && !scEmail.value) scEmail.value = detectedEmail;
       }
 
       initAllSelect2();
@@ -1276,7 +1291,7 @@
         CIDADE: jQuery('#pub-cidade').val() || '',
         FUNCAO: jQuery('#pub-funcao').val() || '',
         EMAIL: document.getElementById('pub-email').value.trim(),
-        TELEFONE: document.getElementById('pub-telefone').value.trim(),
+        TELEFONE: normalizePhoneDigitsClient(document.getElementById('pub-telefone').value),
         ACEITE_LGPD: document.getElementById('pub-lgpd').checked,
         AUTO_CHECKIN_NOW: document.getElementById('pub-auto-checkin-now').value === 'true'
       };
@@ -1712,61 +1727,43 @@
     }
 
     /**
-     * Executa o Auto Check-in validando o campo selecionado no selectbox (E-mail ou Telefone).
+     * Executa o Auto Check-in manual validando exclusivamente pelo Telefone higienizado cadastrado na inscrição.
      * @param {Event} event Submit event.
      */
     async function handleManualSelfCheckinSubmit(event) {
       event.preventDefault();
 
-      const tipoValidacao = jQuery('#sc-tipo-validacao').val() || 'EMAIL';
-      const emailEl = document.getElementById('sc-email');
       const phoneEl = document.getElementById('sc-telefone');
-      const wrapEmail = document.getElementById('wrap-sc-email');
       const wrapPhone = document.getElementById('wrap-sc-telefone');
+      const rawPhone = phoneEl ? phoneEl.value.trim() : '';
+      const phoneDigits = normalizePhoneDigitsClient(rawPhone);
 
-      let email = '';
-      let telefone = '';
+      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+        if (wrapPhone) wrapPhone.classList.add('has-error', 'field-invalid');
+        if (phoneEl) {
+          phoneEl.setAttribute('aria-invalid', 'true');
+          phoneEl.classList.add('user-invalid-fallback');
+          phoneEl.focus();
+        }
+        toastr.warning('Informe o telefone/celular completo com DDD (10 ou 11 dígitos).');
+        return;
+      }
 
-      if (tipoValidacao === 'EMAIL') {
-        email = emailEl ? emailEl.value.trim() : '';
-        const emailValid = email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-        if (!emailValid) {
-          if (wrapEmail) wrapEmail.classList.add('has-error');
-          if (emailEl) {
-            emailEl.setAttribute('aria-invalid', 'true');
-            emailEl.focus();
-          }
-          toastr.warning('Informe um endereço de e-mail válido cadastrado na inscrição.');
-          return;
-        }
-        if (wrapEmail) wrapEmail.classList.remove('has-error');
-        if (emailEl) emailEl.removeAttribute('aria-invalid');
-      } else {
-        telefone = phoneEl ? phoneEl.value.trim() : '';
-        const digits = telefone.replace(/\D/g, '');
-        if (digits.length < 10) {
-          if (wrapPhone) wrapPhone.classList.add('has-error');
-          if (phoneEl) {
-            phoneEl.setAttribute('aria-invalid', 'true');
-            phoneEl.focus();
-          }
-          toastr.warning('Informe o telefone/celular completo com DDD (10 ou 11 dígitos).');
-          return;
-        }
-        if (wrapPhone) wrapPhone.classList.remove('has-error');
-        if (phoneEl) phoneEl.removeAttribute('aria-invalid');
+      if (wrapPhone) wrapPhone.classList.remove('has-error', 'field-invalid');
+      if (phoneEl) {
+        phoneEl.removeAttribute('aria-invalid');
+        phoneEl.classList.remove('user-invalid-fallback');
       }
 
       const ev = AppState.portal.activeEvent;
       if (!ev) return;
 
       try {
-        setLoading(true, 'Validando dados de inscrição e confirmando presença...');
+        setLoading(true, 'Validando telefone cadastrado e confirmando presença...');
         const response = await callServerRpc('apiSubmitOnlineSelfCheckIn', {
           ID_EVENTO: ev.ID_EVENTO,
-          METHOD: 'EMAIL_PHONE',
-          EMAIL: email,
-          TELEFONE: telefone
+          METHOD: 'PHONE',
+          TELEFONE: phoneDigits
         });
         setLoading(false);
 
@@ -3595,11 +3592,16 @@
           return false;
         }
         if (searchQuery) {
+          const searchDigits = normalizePhoneDigitsClient(searchQuery);
           const matchNome = (ins.NOME_COMPLETO || '').toLowerCase().includes(searchQuery);
           const matchUuid = (ins.ID_INSCRICAO || '').toLowerCase().includes(searchQuery);
           const matchEmail = (ins.EMAIL || '').toLowerCase().includes(searchQuery);
+          const matchPhone =
+            (ins.TELEFONE || '').toLowerCase().includes(searchQuery) ||
+            (searchDigits.length >= 3 &&
+              normalizePhoneDigitsClient(ins.TELEFONE || '').includes(searchDigits));
           const matchFuncao = (ins.FUNCAO || '').toLowerCase().includes(searchQuery);
-          if (!matchNome && !matchUuid && !matchEmail && !matchFuncao) return false;
+          if (!matchNome && !matchUuid && !matchEmail && !matchPhone && !matchFuncao) return false;
         }
         return true;
       });
@@ -3745,7 +3747,7 @@
         CIDADE: jQuery('#man-cidade').val() || '',
         FUNCAO: jQuery('#man-funcao').val() || '',
         EMAIL: document.getElementById('man-email').value.trim(),
-        TELEFONE: document.getElementById('man-telefone').value.trim(),
+        TELEFONE: normalizePhoneDigitsClient(document.getElementById('man-telefone').value),
         PRESENCA_CONFIRMADA: jQuery('#man-presenca').val() === 'true',
         ACEITE_LGPD: document.getElementById('man-lgpd').checked
       };
@@ -4626,7 +4628,7 @@
      * MÁSCARA DE TELEFONE E BINDING DE EVENTOS DO DOM
      * ======================================================================== */
     function formatPhoneMask(value) {
-      const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
+      const digits = normalizePhoneDigitsClient(value).slice(0, 11);
       if (digits.length === 0) return '';
       if (digits.length <= 2) return `(${digits}`;
       if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
@@ -4723,7 +4725,8 @@
       document.getElementById('btn-sc-not-me').addEventListener('click', () => {
         document.getElementById('sc-auto-detected-box').classList.add('d-none');
         document.getElementById('sc-manual-form-box').classList.remove('d-none');
-        document.getElementById('sc-email').focus();
+        const phoneInput = document.getElementById('sc-telefone');
+        if (phoneInput) phoneInput.focus();
       });
 
       // Máscara de telefone nos inputs de inscrição completa e auto check-in
@@ -4757,46 +4760,19 @@
       FormAccessibilityBridge.bindForm(formManIns);
       formManIns.addEventListener('submit', handleManualInscricaoSubmit);
 
-      // Vincula pares E-mail / Telefone (onde pelo menos um é obrigatório)
+      // Vincula pares E-mail / Telefone nas inscrições (onde pelo menos um é obrigatório)
       bindEitherEmailOrPhonePair('pub-email', 'pub-telefone');
       bindEitherEmailOrPhonePair('man-email', 'man-telefone');
 
-      // Alternância entre validação por E-mail ou Telefone no Self Check-in
-      jQuery('#sc-tipo-validacao').on('change', function () {
-        const tipo = jQuery(this).val() || 'EMAIL';
-        const wrapEmail = document.getElementById('wrap-sc-email');
-        const wrapPhone = document.getElementById('wrap-sc-telefone');
-        const emailEl = document.getElementById('sc-email');
-        const phoneEl = document.getElementById('sc-telefone');
-
-        if (wrapEmail) wrapEmail.classList.remove('has-error');
-        if (wrapPhone) wrapPhone.classList.remove('has-error');
-        if (emailEl) emailEl.removeAttribute('aria-invalid');
-        if (phoneEl) phoneEl.removeAttribute('aria-invalid');
-
-        if (tipo === 'TELEFONE') {
-          if (wrapEmail) wrapEmail.classList.add('d-none');
-          if (wrapPhone) wrapPhone.classList.remove('d-none');
-          if (emailEl) emailEl.value = '';
-          if (phoneEl) phoneEl.focus();
-        } else {
-          if (wrapPhone) wrapPhone.classList.add('d-none');
-          if (wrapEmail) wrapEmail.classList.remove('d-none');
-          if (phoneEl) phoneEl.value = '';
-          if (emailEl) emailEl.focus();
-        }
-      });
-
-      ['sc-email', 'sc-telefone'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.addEventListener('input', () => {
-            const wrap = el.closest('.col-md-7');
-            if (wrap) wrap.classList.remove('has-error');
-            el.removeAttribute('aria-invalid');
-          });
-        }
-      });
+      const scPhoneEl = document.getElementById('sc-telefone');
+      if (scPhoneEl) {
+        scPhoneEl.addEventListener('input', () => {
+          const wrap = scPhoneEl.closest('.col-12, .col-md-7');
+          if (wrap) wrap.classList.remove('has-error', 'field-invalid');
+          scPhoneEl.removeAttribute('aria-invalid');
+          scPhoneEl.classList.remove('user-invalid-fallback');
+        });
+      }
 
       // Botões do Comprovante QR Code
       const btnVoucherWa = document.getElementById('btn-voucher-whatsapp');

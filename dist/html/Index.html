@@ -609,52 +609,31 @@
                       <i class="bi bi-check2-circle me-1"></i>Confirmar Minha Presença Agora
                     </button>
                     <button type="button" id="btn-sc-not-me" class="btn btn-sm btn-outline-secondary">
-                      Não sou eu / Usar outro e-mail
+                      Não sou eu / Confirmar por Telefone
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- 2. Formulário de Confirmação Segura (Seleção entre E-mail ou Telefone) -->
+            <!-- 2. Formulário de Confirmação Manual Segura (Apenas por Telefone) -->
             <div id="sc-manual-form-box">
               <h4 class="fs-6 mb-2">
-                <i class="bi bi-shield-check text-primary me-1"></i>Confirmação por E-mail ou Telefone
+                <i class="bi bi-telephone-check text-primary me-1"></i>Confirmação por Telefone / Celular
               </h4>
               <p class="small text-secondary mb-3 pretty-text">
-                Selecione por qual dado deseja validar sua inscrição (<strong>E-mail</strong> ou
-                <strong>Telefone/Celular</strong>) e preencha o campo ao lado para confirmar sua presença:
+                Informe o número de <strong>Telefone / Celular com DDD</strong> cadastrado na inscrição para validar
+                seus dados e confirmar sua presença:
               </p>
 
               <form id="form-self-checkin" novalidate>
                 <div class="row g-3 align-items-start">
-                  <div class="col-md-5" id="wrap-sc-tipo">
-                    <label for="sc-tipo-validacao" class="form-label">
-                      Validar Presença Por <span class="text-danger">*</span>
-                    </label>
-                    <select id="sc-tipo-validacao" class="form-select js-select2">
-                      <option value="EMAIL" selected>E-mail da Inscrição</option>
-                      <option value="TELEFONE">Telefone / Celular</option>
-                    </select>
-                  </div>
-
-                  <div class="col-md-7" id="wrap-sc-email">
-                    <label for="sc-email" class="form-label">
-                      E-mail da Inscrição <span class="text-danger">*</span>
-                    </label>
-                    <input type="email" id="sc-email" class="form-control" placeholder="Digite o e-mail cadastrado..."
-                      autocomplete="email" aria-errormessage="err-sc-email">
-                    <div id="err-sc-email" class="error-msg">
-                      <span aria-hidden="true">&#9888;</span> Informe um endereço de e-mail válido.
-                    </div>
-                  </div>
-
-                  <div class="col-md-7 d-none" id="wrap-sc-telefone">
+                  <div class="col-12" id="wrap-sc-telefone">
                     <label for="sc-telefone" class="form-label">
                       Telefone / Celular com DDD <span class="text-danger">*</span>
                     </label>
                     <input type="tel" id="sc-telefone" class="form-control" placeholder="(19) 99999-9999" maxlength="20"
-                      autocomplete="tel" aria-errormessage="err-sc-telefone">
+                      autocomplete="tel" required aria-errormessage="err-sc-telefone">
                     <div id="err-sc-telefone" class="error-msg">
                       <span aria-hidden="true">&#9888;</span> Informe o telefone/celular completo com DDD cadastrado na
                       inscrição.
@@ -1659,7 +1638,7 @@
               Aponte a câmera do seu celular para confirmar sua presença online
             </p>
             <p class="poster-cta-sub small text-secondary mb-3 mx-auto">
-              Validação automática via Conta Google/Dispositivo ou informando seu E-mail e Telefone de inscrição.
+              Validação automática via Conta Google/Dispositivo ou informando seu Telefone de inscrição.
             </p>
           </div>
 

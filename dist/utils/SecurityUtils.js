@@ -149,24 +149,42 @@ const SecurityUtils = (() => {
   }
 
   /**
-   * Extrai apenas os dígitos numéricos de um telefone.
+   * Extrai e higieniza os dígitos numéricos de um telefone brasileiro:
+   * remove pontuações, espaços, DDI +55 e zero à esquerda do DDD.
    * @param {string} phone Telefone informado.
-   * @returns {string} Somente números.
+   * @returns {string} Somente os dígitos higienizados.
    */
-  function extractPhoneDigits(phone) {
-    if (!phone) return '';
-    return String(phone).replace(/\D/g, '');
+  function normalizePhoneDigits(phone) {
+    if (phone === null || phone === undefined) return '';
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length >= 12 && digits.startsWith('55')) {
+      digits = digits.slice(2);
+    }
+    while (digits.length >= 11 && digits.startsWith('0')) {
+      digits = digits.slice(1);
+    }
+    return digits;
   }
 
   /**
-   * Sanitiza e valida número de telefone obrigatório (DDD + número: 10 ou 11 dígitos).
+   * Extrai apenas os dígitos numéricos higienizados de um telefone.
+   * @param {string} phone Telefone informado.
+   * @returns {string} Somente números higienizados.
+   */
+  function extractPhoneDigits(phone) {
+    return normalizePhoneDigits(phone);
+  }
+
+  /**
+   * Higieniza e valida número de telefone obrigatório (DDD + número: 10 ou 11 dígitos),
+   * normalizando +55, zero à esquerda e máscaras antes de formatar no padrão canônico (XX) XXXXX-XXXX.
    * @param {string} phone Telefone informado.
    * @param {boolean} [required=true] Se verdadeiro, exige preenchimento válido.
-   * @returns {string} Telefone formatado no padrão brasileiro (XX) XXXXX-XXXX.
+   * @returns {string} Telefone higienizado e formatado no padrão brasileiro (XX) XXXXX-XXXX.
    * @throws {Error} Caso o telefone seja inválido ou ausente quando obrigatório.
    */
   function sanitizePhone(phone, required = true) {
-    const digits = extractPhoneDigits(phone);
+    const digits = normalizePhoneDigits(phone);
     if (!digits) {
       if (required) {
         throw new Error('O campo "Telefone / Celular" com DDD é obrigatório.');
@@ -185,29 +203,22 @@ const SecurityUtils = (() => {
   }
 
   /**
-   * Verifica de forma segura se o telefone informado no auto-credenciamento
-   * confere com o telefone cadastrado na inscrição (aceita telefone completo com DDD,
-   * sem DDD ou os 4 últimos dígitos quando combinado com o e-mail cadastrado).
+   * Verifica com precisão se o telefone higienizado informado no check-in manual
+   * confere exatamente com o telefone cadastrado na inscrição.
    *
    * @param {string} registeredPhone Telefone gravado na inscrição.
    * @param {string} candidateInput Valor informado pelo participante na validação.
-   * @returns {boolean} True se houver correspondência segura.
+   * @returns {boolean} True se houver correspondência exata dos dígitos higienizados.
    */
   function matchesPhoneVerification(registeredPhone, candidateInput) {
-    const regDigits = extractPhoneDigits(registeredPhone);
-    const candDigits = extractPhoneDigits(candidateInput);
+    const regDigits = normalizePhoneDigits(registeredPhone);
+    const candDigits = normalizePhoneDigits(candidateInput);
 
-    if (!regDigits || regDigits.length < 4 || !candDigits || candDigits.length < 4) {
+    if (regDigits.length < 10 || candDigits.length < 10) {
       return false;
     }
 
-    // Se informou o telefone completo (10 ou 11 dígitos)
-    if (candDigits.length >= 10) {
-      return regDigits === candDigits || regDigits.endsWith(candDigits.slice(-8));
-    }
-
-    // Se informou os últimos 4 a 9 dígitos do telefone cadastrado
-    return regDigits.endsWith(candDigits);
+    return regDigits === candDigits;
   }
 
   /**
@@ -465,6 +476,7 @@ const SecurityUtils = (() => {
     assertAdminAuthorized,
     sanitizeText,
     sanitizeEmail,
+    normalizePhoneDigits,
     extractPhoneDigits,
     sanitizePhone,
     matchesPhoneVerification,
