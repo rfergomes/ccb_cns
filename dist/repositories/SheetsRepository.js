@@ -31,7 +31,7 @@ class SheetsRepository {
   }
 
   /**
-   * Garante que ambas as tabelas (EVENTOS e INSCRICOES) existam e possuam
+   * Garante que todas as tabelas (EVENTOS, INSCRICOES e FUNCOES) existam e possuam
    * exatamente os cabeçalhos exigidos pelo modelo de dados.
    * @returns {void}
    */
@@ -44,6 +44,45 @@ class SheetsRepository {
       Environment.TABLES.INSCRICOES.NAME,
       Environment.TABLES.INSCRICOES.COLUMNS
     );
+    this.ensureFuncoesInitialized_();
+  }
+
+  /**
+   * Garante a criação da aba FUNCOES e realiza a carga inicial padrão na primeira criação.
+   * @returns {GoogleAppsScript.Spreadsheet.Sheet} Aba FUNCOES validada.
+   * @private
+   */
+  ensureFuncoesInitialized_() {
+    if (this.verifiedTables_[Environment.TABLES.FUNCOES.NAME]) {
+      return this.verifiedTables_[Environment.TABLES.FUNCOES.NAME];
+    }
+
+    const ss = this.getSpreadsheet_();
+    const existingSheet = ss.getSheetByName(Environment.TABLES.FUNCOES.NAME);
+    const shouldSeedInitial = !existingSheet || existingSheet.getLastRow() === 0;
+
+    const sheet = this.ensureTable_(
+      Environment.TABLES.FUNCOES.NAME,
+      Environment.TABLES.FUNCOES.COLUMNS
+    );
+
+    if (shouldSeedInitial && sheet.getLastRow() <= 1) {
+      this.withWriteLock_(() => {
+        if (sheet.getLastRow() <= 1) {
+          const initialRows = Environment.FUNCOES_INICIAIS_CATALOGO.map((fn) =>
+            this.mapFuncaoToRow_(fn)
+          );
+          if (initialRows.length > 0) {
+            const numCols = Environment.TABLES.FUNCOES.COLUMNS.length;
+            const range = sheet.getRange(2, 1, initialRows.length, numCols);
+            range.setNumberFormats(initialRows.map(() => ['@', '@', '@', 'General']));
+            range.setValues(initialRows);
+          }
+        }
+      });
+    }
+
+    return sheet;
   }
 
   /**
@@ -194,7 +233,8 @@ class SheetsRepository {
       HORA_LANCHE: SecurityUtils.normalizeTimeString(row[4]),
       LOCAL: String(row[5] || '').trim(),
       STATUS: String(row[6] || Environment.EVENT_STATUS.ENCERRADO).trim().toUpperCase(),
-      LINK_MAPA: String(row[7] || '').trim()
+      LINK_MAPA: String(row[7] || '').trim(),
+      COMPLEMENTO_LOCAL: String(row[8] || '').trim()
     };
   }
 
@@ -213,7 +253,8 @@ class SheetsRepository {
       String(evento.HORA_LANCHE).trim(),
       String(evento.LOCAL).trim(),
       String(evento.STATUS).trim().toUpperCase(),
-      String(evento.LINK_MAPA || '').trim()
+      String(evento.LINK_MAPA || '').trim(),
+      String(evento.COMPLEMENTO_LOCAL || '').trim()
     ];
   }
 
@@ -323,7 +364,8 @@ class SheetsRepository {
         HORA_LANCHE: eventoData.HORA_LANCHE,
         LOCAL: eventoData.LOCAL,
         STATUS: eventoData.STATUS || Environment.EVENT_STATUS.ATIVO,
-        LINK_MAPA: String(eventoData.LINK_MAPA || '').trim()
+        LINK_MAPA: String(eventoData.LINK_MAPA || '').trim(),
+        COMPLEMENTO_LOCAL: String(eventoData.COMPLEMENTO_LOCAL || '').trim()
       };
 
       const rowValues = this.mapEventoToRow_(novoEvento);
@@ -374,7 +416,11 @@ class SheetsRepository {
             HORA_LANCHE: updates.HORA_LANCHE !== undefined ? updates.HORA_LANCHE : currentEvento.HORA_LANCHE,
             LOCAL: updates.LOCAL !== undefined ? updates.LOCAL : currentEvento.LOCAL,
             STATUS: updates.STATUS !== undefined ? updates.STATUS : currentEvento.STATUS,
-            LINK_MAPA: updates.LINK_MAPA !== undefined ? updates.LINK_MAPA : currentEvento.LINK_MAPA
+            LINK_MAPA: updates.LINK_MAPA !== undefined ? updates.LINK_MAPA : currentEvento.LINK_MAPA,
+            COMPLEMENTO_LOCAL:
+              updates.COMPLEMENTO_LOCAL !== undefined
+                ? updates.COMPLEMENTO_LOCAL
+                : currentEvento.COMPLEMENTO_LOCAL
           };
 
           const rowNumber = i + 2;
@@ -668,7 +714,7 @@ class SheetsRepository {
       const targetId = idInscricao.trim().toLowerCase();
       const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
 
-      for (let i = ids.length - 1; i >= 0; i--) {
+          for (let i = ids.length - 1; i >= 0; i--) {
         if (String(ids[i][0] || '').trim().toLowerCase() === targetId) {
           sheet.deleteRow(i + 2);
           return true;
@@ -676,6 +722,261 @@ class SheetsRepository {
       }
 
       throw new Error(`Inscrição com UUID "${idInscricao}" não localizada para exclusão.`);
+    });
+  }
+
+  /* ==========================================================================
+   * REPOSITÓRIO DE FUNÇÕES / MINISTÉRIOS (TABELA: FUNCOES)
+   * ========================================================================== */
+
+  /**
+   * Converte uma linha da aba FUNCOES em um objeto de domínio tipado.
+   * @param {Array<*>} row Linha bruta da planilha.
+   * @returns {{FUNCAO_ID: string, FUNCAO: string, TIPO: string, ATIVO: boolean}}
+   * @private
+   */
+  mapRowToFuncao_(row) {
+    return {
+      FUNCAO_ID: String(row[0] || '').trim().toUpperCase(),
+      FUNCAO: String(row[1] || '').trim(),
+      TIPO: String(row[2] || 'Outros').trim(),
+      ATIVO: SecurityUtils.parseBoolean(row[3])
+    };
+  }
+
+  /**
+   * Converte um objeto Função em linha ordenada conforme o schema FUNCOES.
+   * @param {Object} fn Objeto Função.
+   * @returns {Array<*>}
+   * @private
+   */
+  mapFuncaoToRow_(fn) {
+    return [
+      String(fn.FUNCAO_ID || '').trim().toUpperCase(),
+      String(fn.FUNCAO || '').trim(),
+      String(fn.TIPO || 'Outros').trim(),
+      Boolean(fn.ATIVO)
+    ];
+  }
+
+  /**
+   * Gera o próximo código sequencial no padrão FUNC-1001, FUNC-1002, etc.
+   * @param {Array<Object>} existingList Lista atual de funções.
+   * @returns {string} Código gerado.
+   * @private
+   */
+  generateNextFuncaoId_(existingList) {
+    let maxSeq = 1000;
+    (existingList || []).forEach((item) => {
+      const m = String(item.FUNCAO_ID || '').match(/^FUNC-(\d+)$/i);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        if (!Number.isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    });
+    return `FUNC-${maxSeq + 1}`;
+  }
+
+  /**
+   * Lista todas as funções cadastradas na aba FUNCOES.
+   * @returns {Array<{FUNCAO_ID: string, FUNCAO: string, TIPO: string, ATIVO: boolean}>}
+   */
+  findAllFuncoes() {
+    const sheet = this.ensureFuncoesInitialized_();
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      return [];
+    }
+
+    const numCols = Environment.TABLES.FUNCOES.COLUMNS.length;
+    const values = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+    return values
+      .map((row) => this.mapRowToFuncao_(row))
+      .filter((fn) => Boolean(fn.FUNCAO_ID && fn.FUNCAO));
+  }
+
+  /**
+   * Retorna os nomes das funções atualmente ativas no catálogo.
+   * @returns {Array<string>}
+   */
+  findActiveFuncaoNames() {
+    return this.findAllFuncoes()
+      .filter((fn) => fn.ATIVO)
+      .map((fn) => fn.FUNCAO);
+  }
+
+  /**
+   * Busca uma função específica pelo código FUNCAO_ID.
+   * @param {string} funcaoId Código (ex: FUNC-1001).
+   * @returns {Object|null}
+   */
+  findFuncaoById(funcaoId) {
+    const target = String(funcaoId || '').trim().toUpperCase();
+    if (!target) return null;
+    return this.findAllFuncoes().find((fn) => fn.FUNCAO_ID.toUpperCase() === target) || null;
+  }
+
+  /**
+   * Insere uma nova função na tabela FUNCOES.
+   * @param {{FUNCAO_ID?: string, FUNCAO: string, TIPO: string, ATIVO?: boolean}} funcaoData
+   * @returns {Object} Função persistida.
+   */
+  insertFuncao(funcaoData) {
+    return this.withWriteLock_(() => {
+      const sheet = this.ensureFuncoesInitialized_();
+      const existing = this.findAllFuncoes();
+
+      const codigo = funcaoData.FUNCAO_ID
+        ? String(funcaoData.FUNCAO_ID).trim().toUpperCase()
+        : this.generateNextFuncaoId_(existing);
+
+      const novaFuncao = {
+        FUNCAO_ID: codigo,
+        FUNCAO: String(funcaoData.FUNCAO || '').trim(),
+        TIPO: String(funcaoData.TIPO || 'Outros').trim(),
+        ATIVO: funcaoData.ATIVO !== undefined ? Boolean(funcaoData.ATIVO) : true
+      };
+
+      const rowValues = this.mapFuncaoToRow_(novaFuncao);
+      const nextRow = sheet.getLastRow() + 1;
+      const range = sheet.getRange(nextRow, 1, 1, rowValues.length);
+      range.setNumberFormats([['@', '@', '@', 'General']]);
+      range.setValues([rowValues]);
+
+      return novaFuncao;
+    });
+  }
+
+  /**
+   * Atualiza uma função existente localizando-a pelo FUNCAO_ID.
+   * @param {string} funcaoId Código da função.
+   * @param {Object} updates Campos a atualizar.
+   * @returns {Object} Função atualizada.
+   */
+  updateFuncaoById(funcaoId, updates) {
+    const target = String(funcaoId || '').trim().toUpperCase();
+    if (!target) {
+      throw new Error('Identificador de função inválido.');
+    }
+
+    return this.withWriteLock_(() => {
+      const sheet = this.ensureFuncoesInitialized_();
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) {
+        throw new Error('Nenhuma função encontrada na base de dados.');
+      }
+
+      const numCols = Environment.TABLES.FUNCOES.COLUMNS.length;
+      const values = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+
+      for (let i = 0; i < values.length; i++) {
+        const currentId = String(values[i][0] || '').trim().toUpperCase();
+        if (currentId === target) {
+          const current = this.mapRowToFuncao_(values[i]);
+          const updated = {
+            FUNCAO_ID: current.FUNCAO_ID,
+            FUNCAO: updates.FUNCAO !== undefined ? updates.FUNCAO : current.FUNCAO,
+            TIPO: updates.TIPO !== undefined ? updates.TIPO : current.TIPO,
+            ATIVO: updates.ATIVO !== undefined ? Boolean(updates.ATIVO) : current.ATIVO
+          };
+
+          const rowNumber = i + 2;
+          const rowValues = this.mapFuncaoToRow_(updated);
+          const range = sheet.getRange(rowNumber, 1, 1, numCols);
+          range.setNumberFormats([['@', '@', '@', 'General']]);
+          range.setValues([rowValues]);
+          return updated;
+        }
+      }
+
+      throw new Error(`Função "${funcaoId}" não localizada.`);
+    });
+  }
+
+  /**
+   * Remove uma função da aba FUNCOES pelo seu FUNCAO_ID.
+   * @param {string} funcaoId Código da função.
+   * @returns {boolean}
+   */
+  deleteFuncaoById(funcaoId) {
+    const target = String(funcaoId || '').trim().toUpperCase();
+    if (!target) {
+      throw new Error('Identificador de função inválido.');
+    }
+
+    return this.withWriteLock_(() => {
+      const sheet = this.ensureFuncoesInitialized_();
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) {
+        throw new Error('Função não encontrada para exclusão.');
+      }
+
+      const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = ids.length - 1; i >= 0; i--) {
+        if (String(ids[i][0] || '').trim().toUpperCase() === target) {
+          sheet.deleteRow(i + 2);
+          return true;
+        }
+      }
+
+      throw new Error(`Função "${funcaoId}" não localizada para exclusão.`);
+    });
+  }
+
+  /**
+   * Insere em lote funções que ainda não existam na tabela FUNCOES (sem duplicar nomes).
+   * @param {Array<{FUNCAO: string, TIPO: string, ATIVO?: boolean}>} catalogItems
+   * @returns {{addedCount: number, addedItems: Array<Object>}}
+   */
+  seedFuncoesCatalogo(catalogItems) {
+    return this.withWriteLock_(() => {
+      const sheet = this.ensureFuncoesInitialized_();
+      const existing = this.findAllFuncoes();
+      const existingNames = new Set(
+        existing.map((f) => SecurityUtils.normalizeSearchText(f.FUNCAO))
+      );
+
+      let maxSeq = 1000;
+      existing.forEach((item) => {
+        const m = String(item.FUNCAO_ID || '').match(/^FUNC-(\d+)$/i);
+        if (m) {
+          const num = parseInt(m[1], 10);
+          if (!Number.isNaN(num) && num > maxSeq) maxSeq = num;
+        }
+      });
+
+      const toInsert = [];
+      (catalogItems || []).forEach((item) => {
+        const cleanName = SecurityUtils.sanitizeText(item.FUNCAO, 120);
+        if (!cleanName) return;
+        const normName = SecurityUtils.normalizeSearchText(cleanName);
+        if (existingNames.has(normName)) return;
+
+        existingNames.add(normName);
+        maxSeq += 1;
+        toInsert.push({
+          FUNCAO_ID: `FUNC-${maxSeq}`,
+          FUNCAO: cleanName,
+          TIPO: SecurityUtils.sanitizeText(item.TIPO || 'Outros', 60) || 'Outros',
+          ATIVO: item.ATIVO !== undefined ? Boolean(item.ATIVO) : true
+        });
+      });
+
+      if (toInsert.length > 0) {
+        const startRow = sheet.getLastRow() + 1;
+        const numCols = Environment.TABLES.FUNCOES.COLUMNS.length;
+        const rows = toInsert.map((fn) => this.mapFuncaoToRow_(fn));
+        const range = sheet.getRange(startRow, 1, rows.length, numCols);
+        range.setNumberFormats(rows.map(() => ['@', '@', '@', 'General']));
+        range.setValues(rows);
+      }
+
+      return {
+        addedCount: toInsert.length,
+        addedItems: toInsert
+      };
     });
   }
 }

@@ -86,6 +86,7 @@ function doGet(e) {
     hasActiveEvent: false,
     activeEvent: null,
     activeEvents: [],
+    upcomingEvents: [],
     googleSessionMatch: null,
     initialVoucher: null,
     metadata: Environment.getPublicMetadata(),
@@ -103,6 +104,7 @@ function doGet(e) {
       hasActiveEvent: portalState.hasActiveEvent,
       activeEvent: portalState.activeEvent,
       activeEvents: portalState.activeEvents,
+      upcomingEvents: portalState.upcomingEvents || [],
       googleSessionMatch: portalState.googleSessionMatch,
       initialVoucher: portalState.initialVoucher,
       metadata: portalState.metadata
@@ -196,6 +198,15 @@ function apiCheckParticipantAutoMatch(idEvento, deviceSavedUuid) {
 function apiSubmitOnlineSelfCheckIn(checkInPayload) {
   const service = new InscriptionService();
   return service.performOnlineSelfCheckIn(checkInPayload);
+}
+
+/**
+ * Retorna a lista dinâmica de funções ativas cadastradas na aba FUNCOES.
+ * @returns {Object} Objeto contendo lista e nomes das funções ativas.
+ */
+function apiListarFuncoes() {
+  const service = new InscriptionService();
+  return service.getActiveFuncoesList();
 }
 
 /* ==========================================================================
@@ -335,11 +346,71 @@ function apiAdminProcessQrCheckIn(adminSecret, qrCodePayload, expectedEventoId) 
 }
 
 /**
+ * Cria ou atualiza uma função institucional na aba FUNCOES.
+ *
+ * @param {string} adminSecret Segredo administrativo.
+ * @param {Object} funcaoPayload Dados da função.
+ * @param {string} [currentFilterId='ALL'] Filtro atual do dashboard.
+ * @returns {Object} Resultado e bundle atualizado.
+ */
+function apiAdminSaveFuncao(adminSecret, funcaoPayload, currentFilterId) {
+  const adminService = new AdminService();
+  const result = adminService.saveFuncao(adminSecret, funcaoPayload);
+  const bundle = adminService.getAdminDataBundle(adminSecret, currentFilterId || 'ALL');
+  return { ...result, bundle };
+}
+
+/**
+ * Ativa ou desativa uma função do catálogo.
+ *
+ * @param {string} adminSecret Segredo administrativo.
+ * @param {string} funcaoId Código FUNCAO_ID.
+ * @param {boolean} ativo Estado desejado.
+ * @param {string} [currentFilterId='ALL'] Filtro atual do dashboard.
+ * @returns {Object} Resultado e bundle atualizado.
+ */
+function apiAdminToggleFuncaoStatus(adminSecret, funcaoId, ativo, currentFilterId) {
+  const adminService = new AdminService();
+  const result = adminService.toggleFuncaoStatus(adminSecret, funcaoId, ativo);
+  const bundle = adminService.getAdminDataBundle(adminSecret, currentFilterId || 'ALL');
+  return { ...result, bundle };
+}
+
+/**
+ * Exclui uma função sem inscrições vinculadas.
+ *
+ * @param {string} adminSecret Segredo administrativo.
+ * @param {string} funcaoId Código FUNCAO_ID.
+ * @param {string} [currentFilterId='ALL'] Filtro atual do dashboard.
+ * @returns {Object} Resultado e bundle atualizado.
+ */
+function apiAdminDeleteFuncao(adminSecret, funcaoId, currentFilterId) {
+  const adminService = new AdminService();
+  const result = adminService.deleteFuncao(adminSecret, funcaoId);
+  const bundle = adminService.getAdminDataBundle(adminSecret, currentFilterId || 'ALL');
+  return { ...result, bundle };
+}
+
+/**
+ * Importa o catálogo complementar de funções institucionais da CCB sem duplicar registros.
+ *
+ * @param {string} adminSecret Segredo administrativo.
+ * @param {string} [currentFilterId='ALL'] Filtro atual do dashboard.
+ * @returns {Object} Resultado e bundle atualizado.
+ */
+function apiAdminSeedFuncoesInstitucionais(adminSecret, currentFilterId) {
+  const adminService = new AdminService();
+  const result = adminService.seedFuncoesInstitucionais(adminSecret);
+  const bundle = adminService.getAdminDataBundle(adminSecret, currentFilterId || 'ALL');
+  return { ...result, bundle };
+}
+
+/**
  * Função utilitária de provisionamento inicial (executável apenas no editor do Apps Script)
- * para garantir a criação das tabelas EVENTOS e INSCRICOES na planilha configurada.
+ * para garantir a criação das tabelas EVENTOS, INSCRICOES e FUNCOES na planilha configurada.
  */
 function initializeDatabaseTables() {
   const repository = new SheetsRepository();
   repository.ensureDatabaseSchema();
-  Logger.log('Tabelas EVENTOS e INSCRICOES verificadas/criadas com sucesso.');
+  Logger.log('Tabelas EVENTOS, INSCRICOES e FUNCOES verificadas/criadas com sucesso.');
 }

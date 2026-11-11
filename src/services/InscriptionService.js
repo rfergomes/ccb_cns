@@ -61,6 +61,18 @@ class InscriptionService {
         )
       }));
 
+    const upcomingEvents = allEventos
+      .filter((evento) => {
+        const isPrevisto = evento.STATUS === Environment.EVENT_STATUS.PREVISTO;
+        const isCurrentOrFuture = Boolean(evento.DATA_EVENTO) && evento.DATA_EVENTO >= today;
+        return isPrevisto && isCurrentOrFuture;
+      })
+      .sort((a, b) => {
+        const cmpDate = a.DATA_EVENTO.localeCompare(b.DATA_EVENTO);
+        if (cmpDate !== 0) return cmpDate;
+        return (a.HORA_EVENTO || '').localeCompare(b.HORA_EVENTO || '');
+      });
+
     let selectedEvent = activeEvents.length > 0 ? activeEvents[0] : null;
     if (preferredEventoId && SecurityUtils.isValidUuid(preferredEventoId)) {
       const targetId = preferredEventoId.trim().toLowerCase();
@@ -75,7 +87,10 @@ class InscriptionService {
       initialVoucher = this.getVoucherById(credentialUuid);
     }
 
-    const metadata = Environment.getPublicMetadata();
+    const metadata = {
+      ...Environment.getPublicMetadata(),
+      funcoes: this.repository_.findActiveFuncaoNames()
+    };
     let googleSessionMatch = null;
 
     if (selectedEvent && metadata.detectedGoogleEmail) {
@@ -103,6 +118,7 @@ class InscriptionService {
       hasActiveEvent: activeEvents.length > 0,
       activeEvent: selectedEvent,
       activeEvents,
+      upcomingEvents,
       googleSessionMatch,
       initialVoucher,
       metadata
@@ -253,13 +269,28 @@ class InscriptionService {
       );
     }
 
-    const funcao = SecurityUtils.sanitizeText(payload.FUNCAO || payload.funcao, 120);
-    if (!funcao) {
+    const funcaoInput = SecurityUtils.sanitizeText(payload.FUNCAO || payload.funcao, 120);
+    if (!funcaoInput) {
       throw new Error('O campo "Função / Ministério" é obrigatório.');
     }
-    if (!Environment.FUNCOES_CNS.includes(funcao)) {
-      throw new Error('A Função / Ministério informada não é válida.');
+
+    const allFuncoes = this.repository_.findAllFuncoes();
+    const allowInactive = Boolean(options.allowClosedEvent);
+    const candidatePool =
+      allFuncoes.length > 0
+        ? allFuncoes
+            .filter((f) => allowInactive || f.ATIVO)
+            .map((f) => f.FUNCAO)
+        : Array.from(Environment.FUNCOES_CNS);
+
+    const normInput = SecurityUtils.normalizeSearchText(funcaoInput);
+    const matchedFuncao = candidatePool.find(
+      (fnName) => SecurityUtils.normalizeSearchText(fnName) === normInput
+    );
+    if (!matchedFuncao) {
+      throw new Error('A Função / Ministério informada não é válida ou não está ativa.');
     }
+    const funcao = matchedFuncao;
 
     // Pelo menos um contato (E-mail ou Telefone) é obrigatório para identificação e auto-credenciamento
     const email = SecurityUtils.sanitizeEmail(payload.EMAIL || payload.email || '', false);
@@ -622,6 +653,23 @@ class InscriptionService {
       inscricao: this.sanitizeInscricaoForPublicDisplay_(updated),
       evento,
       qrPayload: updated.ID_INSCRICAO
+    };
+  }
+
+  /**
+   * Lista as funções ativas cadastradas no catálogo dinâmico para popular selects públicos.
+   * @returns {{success: boolean, funcoes: Array<Object>, names: Array<string>}}
+   */
+  getActiveFuncoesList() {
+    this.repository_.ensureDatabaseSchema();
+    const ativas = this.repository_
+      .findAllFuncoes()
+      .filter((f) => f.ATIVO)
+      .sort((a, b) => a.FUNCAO.localeCompare(b.FUNCAO, 'pt-BR'));
+    return {
+      success: true,
+      funcoes: ativas,
+      names: ativas.map((f) => f.FUNCAO)
     };
   }
 }

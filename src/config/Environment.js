@@ -46,7 +46,8 @@ const Environment = (() => {
         'HORA_LANCHE',
         'LOCAL',
         'STATUS',
-        'LINK_MAPA'
+        'LINK_MAPA',
+        'COMPLEMENTO_LOCAL'
       ])
     },
     INSCRICOES: {
@@ -63,6 +64,15 @@ const Environment = (() => {
         'DATA_HORA_ACEITE',
         'PRESENCA_CONFIRMADA',
         'DATA_HORA_PRESENCA'
+      ])
+    },
+    FUNCOES: {
+      NAME: 'FUNCOES',
+      COLUMNS: Object.freeze([
+        'FUNCAO_ID',
+        'FUNCAO',
+        'TIPO',
+        'ATIVO'
       ])
     }
   });
@@ -113,6 +123,77 @@ const Environment = (() => {
     'Encarregado de Suprimentos / Compras',
     'Apoio Administrativo / Recepção',
     'Convidado / Outro'
+  ]);
+
+  /**
+   * Classificações institucionais disponíveis para o cadastro de Funções / Ministérios.
+   * @readonly
+   * @type {ReadonlyArray<string>}
+   */
+  const TIPOS_FUNCAO = Object.freeze([
+    'CNS / Suprimentos',
+    'Ministério',
+    'Administração / Estatutário',
+    'Música',
+    'Colaborador',
+    'Outros'
+  ]);
+
+  /**
+   * Catálogo padrão inicial populado automaticamente na primeira criação da aba FUNCOES.
+   * Preserva integralmente as funções canônicas utilizadas na Agenda CNS.
+   * @readonly
+   * @type {ReadonlyArray<{FUNCAO_ID: string, FUNCAO: string, TIPO: string, ATIVO: boolean}>}
+   */
+  const FUNCOES_INICIAIS_CATALOGO = Object.freeze([
+    { FUNCAO_ID: 'FUNC-1001', FUNCAO: 'Negociador de Suprimentos (CNS)', TIPO: 'CNS / Suprimentos', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1002', FUNCAO: 'Coordenador Regional CNS', TIPO: 'CNS / Suprimentos', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1003', FUNCAO: 'Membro da Administração', TIPO: 'Administração / Estatutário', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1004', FUNCAO: 'Ancião / Ministério', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1005', FUNCAO: 'Diácono', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1006', FUNCAO: 'Cooperador do Ofício Ministerial', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1007', FUNCAO: 'Cooperador de Jovens e Menores', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1008', FUNCAO: 'Encarregado de Suprimentos / Compras', TIPO: 'CNS / Suprimentos', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1009', FUNCAO: 'Apoio Administrativo / Recepção', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO_ID: 'FUNC-1010', FUNCAO: 'Convidado / Outro', TIPO: 'Outros', ATIVO: true }
+  ]);
+
+  /**
+   * Catálogo complementar institucional CCB acionável sob demanda pelo Administrador ("Carga Institucional CCB").
+   * @readonly
+   * @type {ReadonlyArray<{FUNCAO: string, TIPO: string, ATIVO: boolean}>}
+   */
+  const FUNCOES_CARGA_INSTITUCIONAL = Object.freeze([
+    { FUNCAO: 'Negociador de Suprimentos (CNS)', TIPO: 'CNS / Suprimentos', ATIVO: true },
+    { FUNCAO: 'Coordenador Regional CNS', TIPO: 'CNS / Suprimentos', ATIVO: true },
+    { FUNCAO: 'Encarregado de Suprimentos / Compras', TIPO: 'CNS / Suprimentos', ATIVO: true },
+    { FUNCAO: 'Ancião / Ministério', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO: 'Diácono', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO: 'Cooperador do Ofício Ministerial', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO: 'Cooperador de Jovens e Menores', TIPO: 'Ministério', ATIVO: true },
+    { FUNCAO: 'Presidente', TIPO: 'Administração / Estatutário', ATIVO: true },
+    { FUNCAO: 'Vice-Presidente', TIPO: 'Administração / Estatutário', ATIVO: true },
+    { FUNCAO: 'Secretário', TIPO: 'Administração / Estatutário', ATIVO: true },
+    { FUNCAO: 'Tesoureiro', TIPO: 'Administração / Estatutário', ATIVO: true },
+    { FUNCAO: 'Membro do Conselho Fiscal', TIPO: 'Administração / Estatutário', ATIVO: true },
+    { FUNCAO: 'Membro da Administração', TIPO: 'Administração / Estatutário', ATIVO: true },
+    { FUNCAO: 'Encarregado Regional de Música', TIPO: 'Música', ATIVO: true },
+    { FUNCAO: 'Encarregado Local de Música', TIPO: 'Música', ATIVO: true },
+    { FUNCAO: 'Examinadora de Música', TIPO: 'Música', ATIVO: true },
+    { FUNCAO: 'Instrutor(a) de Música', TIPO: 'Música', ATIVO: true },
+    { FUNCAO: 'Organista', TIPO: 'Música', ATIVO: true },
+    { FUNCAO: 'Músico', TIPO: 'Música', ATIVO: true },
+    { FUNCAO: 'Auxiliar de Escrita', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Apoio Administrativo / Recepção', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Porteiro', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Som e Transmissão', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Auxiliar da Porta', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Tráfego e Estacionamento', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Apoio e Limpeza', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Manutenção Preventiva', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Engenheiro', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Advogado', TIPO: 'Colaborador', ATIVO: true },
+    { FUNCAO: 'Convidado / Outro', TIPO: 'Outros', ATIVO: true }
   ]);
 
   /**
@@ -224,6 +305,7 @@ const Environment = (() => {
       comissao: 'Comissão de Negociadores de Suprimentos (CNS)',
       cidades: CIDADES_REGIONAL_CAMPINAS,
       funcoes: FUNCOES_CNS,
+      tiposFuncao: TIPOS_FUNCAO,
       statusEventos: EVENT_STATUS,
       logos: LOGOS,
       webAppUrl: getWebAppUrl(),
@@ -240,6 +322,9 @@ const Environment = (() => {
     EVENT_STATUS,
     CIDADES_REGIONAL_CAMPINAS,
     FUNCOES_CNS,
+    TIPOS_FUNCAO,
+    FUNCOES_INICIAIS_CATALOGO,
+    FUNCOES_CARGA_INSTITUCIONAL,
     getSpreadsheetId,
     getAdminSecret,
     getTimeZone,

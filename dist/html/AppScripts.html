@@ -18,6 +18,7 @@
         hasActiveEvent: false,
         activeEvent: null,
         activeEvents: [],
+        upcomingEvents: [],
         googleSessionMatch: null,
         autoMatchCandidate: null,
         autoMatchSource: 'NONE',
@@ -461,12 +462,61 @@
       });
     }
 
+    function populateDynamicFuncaoSelects() {
+      const funcoes = (AppState.portal.metadata && AppState.portal.metadata.funcoes) || [];
+      const tipos =
+        (AppState.portal.metadata && AppState.portal.metadata.tiposFuncao) ||
+        ['CNS / Suprimentos', 'Ministério', 'Administração / Estatutário', 'Música', 'Colaborador', 'Outros'];
+
+      const pubFuncao = document.getElementById('pub-funcao');
+      if (pubFuncao) {
+        const prevPub = jQuery(pubFuncao).val() || '';
+        pubFuncao.innerHTML =
+          '<option value="">Selecione sua função...</option>' +
+          funcoes.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+        if (prevPub && funcoes.includes(prevPub)) {
+          pubFuncao.value = prevPub;
+        }
+      }
+
+      const manFuncao = document.getElementById('man-funcao');
+      if (manFuncao) {
+        const prevMan = jQuery(manFuncao).val() || '';
+        manFuncao.innerHTML = funcoes
+          .map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+        if (prevMan && funcoes.includes(prevMan)) {
+          manFuncao.value = prevMan;
+        }
+      }
+
+      const fnFilterTipo = document.getElementById('fn-filter-tipo');
+      if (fnFilterTipo) {
+        const prevTipoFilter = fnFilterTipo.value || 'ALL';
+        fnFilterTipo.innerHTML =
+          '<option value="ALL">Todos os Tipos</option>' +
+          tipos.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+        if (prevTipoFilter && (prevTipoFilter === 'ALL' || tipos.includes(prevTipoFilter))) {
+          fnFilterTipo.value = prevTipoFilter;
+        }
+      }
+
+      const fnTipo = document.getElementById('fn-tipo');
+      if (fnTipo) {
+        const prevTipo = fnTipo.value || tipos[0] || '';
+        fnTipo.innerHTML = tipos
+          .map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`)
+          .join('');
+        if (prevTipo && tipos.includes(prevTipo)) {
+          fnTipo.value = prevTipo;
+        }
+      }
+    }
+
     /**
      * Popula as opções de Cidade e Função nos selects públicos e administrativos.
      */
     function populateStaticSelectOptions() {
       const cidades = (AppState.portal.metadata && AppState.portal.metadata.cidades) || [];
-      const funcoes = (AppState.portal.metadata && AppState.portal.metadata.funcoes) || [];
 
       const pubCidade = document.getElementById('pub-cidade');
       if (pubCidade) {
@@ -475,23 +525,10 @@
           cidades.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
       }
 
-      const pubFuncao = document.getElementById('pub-funcao');
-      if (pubFuncao) {
-        pubFuncao.innerHTML =
-          '<option value="">Selecione sua função...</option>' +
-          funcoes.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
-      }
-
       const manCidade = document.getElementById('man-cidade');
       if (manCidade) {
         manCidade.innerHTML = cidades
           .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-      }
-
-      const manFuncao = document.getElementById('man-funcao');
-      if (manFuncao) {
-        manFuncao.innerHTML = funcoes
-          .map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
       }
 
       const insFilterCidade = document.getElementById('ins-filter-cidade');
@@ -500,6 +537,8 @@
           '<option value="ALL">Todas as Cidades</option>' +
           cidades.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
       }
+
+      populateDynamicFuncaoSelects();
 
       // Se houver e-mail de Conta Google detectado na sessão, pré-preenche nos campos de e-mail
       const detectedEmail = AppState.portal.metadata && AppState.portal.metadata.detectedGoogleEmail;
@@ -514,6 +553,112 @@
     }
 
     /* ========================================================================
+     * NAVEGAÇÃO RESPONSIVA (NAVBAR POPOVER + RESIZEOBSERVER)
+     * ======================================================================== */
+    const SUPPORTS_NATIVE_POPOVER =
+      typeof HTMLElement !== 'undefined' &&
+      Object.prototype.hasOwnProperty.call(HTMLElement.prototype, 'popover');
+
+    function closePrimaryNavMenu() {
+      const header = document.getElementById('ccb-site-header');
+      const menu = document.getElementById('ccb-primary-menu');
+      const btn = document.getElementById('btn-nav-menu-toggle');
+      if (!header || !menu) return;
+
+      if (!header.classList.contains('is-wide')) {
+        if (SUPPORTS_NATIVE_POPOVER && typeof menu.hidePopover === 'function') {
+          try {
+            if (menu.matches(':popover-open')) menu.hidePopover();
+          } catch (_) {
+            // Ignora se popover não estiver aberto
+          }
+        }
+        menu.classList.remove('is-fallback-open');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function initResponsiveNavbar() {
+      const header = document.getElementById('ccb-site-header');
+      const inner = header ? header.querySelector('.ccb-header-inner') : null;
+      const menu = document.getElementById('ccb-primary-menu');
+      const toggleBtn = document.getElementById('btn-nav-menu-toggle');
+      if (!header || !inner || !menu || !toggleBtn) return;
+
+      let lastWidth = 0;
+
+      const syncNavLayout = () => {
+        const wasOpen = SUPPORTS_NATIVE_POPOVER
+          ? menu.matches(':popover-open')
+          : menu.classList.contains('is-fallback-open');
+
+        header.classList.add('is-measuring', 'is-wide');
+        menu.removeAttribute('popover');
+
+        const fits = inner.scrollWidth <= inner.clientWidth + 1;
+        header.classList.toggle('is-wide', fits);
+
+        if (fits) {
+          menu.removeAttribute('popover');
+          menu.classList.remove('is-fallback-open');
+          toggleBtn.setAttribute('aria-expanded', 'false');
+        } else {
+          if (SUPPORTS_NATIVE_POPOVER) {
+            menu.setAttribute('popover', 'auto');
+            if (wasOpen && typeof menu.showPopover === 'function') {
+              try {
+                menu.showPopover();
+              } catch (_) {}
+            }
+          } else {
+            menu.removeAttribute('popover');
+          }
+        }
+
+        requestAnimationFrame(() => {
+          header.classList.remove('is-measuring');
+        });
+      };
+
+      if (SUPPORTS_NATIVE_POPOVER) {
+        menu.addEventListener('toggle', (e) => {
+          toggleBtn.setAttribute('aria-expanded', e.newState === 'open' ? 'true' : 'false');
+        });
+      } else {
+        toggleBtn.removeAttribute('popovertarget');
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const willOpen = !menu.classList.contains('is-fallback-open');
+          menu.classList.toggle('is-fallback-open', willOpen);
+          toggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+        document.addEventListener('click', (e) => {
+          if (!header.classList.contains('is-wide') && !e.target.closest('.ccb-site-nav')) {
+            closePrimaryNavMenu();
+          }
+        });
+      }
+
+      if (window.ResizeObserver) {
+        const ro = new ResizeObserver((entries) => {
+          const w = entries[0] ? entries[0].contentRect.width : header.clientWidth;
+          if (header.classList.contains('is-wide') || w > lastWidth) {
+            lastWidth = w;
+            syncNavLayout();
+          } else {
+            lastWidth = w;
+          }
+        });
+        ro.observe(header);
+      } else {
+        window.addEventListener('resize', syncNavLayout);
+      }
+
+      lastWidth = header.clientWidth;
+      syncNavLayout();
+    }
+
+    /* ========================================================================
      * ROTEAMENTO DE VIEWS (PORTAL vs. CHECKIN ONLINE vs. ADMIN)
      * ======================================================================== */
     function switchView(targetView, options = {}) {
@@ -522,6 +667,7 @@
       else if (targetView === 'checkin') normalized = 'checkin';
 
       AppState.currentView = normalized;
+      closePrimaryNavMenu();
 
       const viewPortal = document.getElementById('view-portal');
       const viewCheckin = document.getElementById('view-checkin');
@@ -535,22 +681,23 @@
       viewCheckin.classList.add('d-none');
       viewAdmin.classList.add('d-none');
 
-      btnPortal.className = 'btn btn-sm btn-outline-light fw-bold';
-      btnCheckin.className = 'btn btn-sm btn-outline-light fw-bold';
-      btnAdmin.className = 'btn btn-sm btn-outline-light fw-bold';
+      [btnPortal, btnCheckin, btnAdmin].forEach((b) => {
+        if (b) b.removeAttribute('aria-current');
+      });
 
       if (normalized === 'admin') {
         viewAdmin.classList.remove('d-none');
-        btnAdmin.className = 'btn btn-sm btn-light fw-bold';
+        if (btnAdmin) btnAdmin.setAttribute('aria-current', 'page');
+        initCheckinEnvironmentHints();
       } else if (normalized === 'checkin') {
         stopQrScanner();
         viewCheckin.classList.remove('d-none');
-        btnCheckin.className = 'btn btn-sm btn-light fw-bold';
+        if (btnCheckin) btnCheckin.setAttribute('aria-current', 'page');
         renderSelfCheckinView();
       } else {
         stopQrScanner();
         viewPortal.classList.remove('d-none');
-        btnPortal.className = 'btn btn-sm btn-light fw-bold';
+        if (btnPortal) btnPortal.setAttribute('aria-current', 'page');
 
         const autoCheckinInput = document.getElementById('pub-auto-checkin-now');
         const instantAlert = document.getElementById('portal-instant-checkin-alert');
@@ -569,25 +716,157 @@
         }
 
         renderPortalView();
+
+        if (options.instantCheckInMode && AppState.portal.hasActiveEvent && AppState.portal.activeEvent) {
+          openPublicInscriptionModal();
+        }
       }
     }
 
     /* ========================================================================
-     * ROTA 1: PORTAL PÚBLICO DE CONVOCAÇÃO E INSCRIÇÃO
+     * ROTA 1: PORTAL PÚBLICO MASTER-DETAIL DE CONVOCAÇÃO E INSCRIÇÃO
      * ======================================================================== */
+    function formatShortMonthPtBr(isoDateStr) {
+      const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+      const parts = String(isoDateStr || '').split('-');
+      if (parts.length !== 3) return '---';
+      const idx = parseInt(parts[1], 10) - 1;
+      return months[idx] || '---';
+    }
+
+    function renderPortalSidebarLists() {
+      const activeListEl = document.getElementById('portal-active-list');
+      const upcomingListEl = document.getElementById('portal-upcoming-list');
+      const activeEvents = AppState.portal.activeEvents || [];
+      const upcomingEvents = AppState.portal.upcomingEvents || [];
+      const selectedId =
+        AppState.portal.activeEvent && AppState.portal.activeEvent.ID_EVENTO
+          ? AppState.portal.activeEvent.ID_EVENTO
+          : '';
+
+      if (activeListEl) {
+        if (activeEvents.length === 0) {
+          activeListEl.innerHTML = `
+            <div class="p-3 rounded border bg-light text-center small text-secondary">
+              <i class="bi bi-calendar-x d-block fs-4 mb-1"></i>
+              Nenhuma convocação aberta para inscrição no momento.
+            </div>
+          `;
+        } else {
+          activeListEl.innerHTML = activeEvents
+            .map((ev) => {
+              const day = String(ev.DATA_EVENTO || '').slice(8, 10) || '--';
+              const mon = formatShortMonthPtBr(ev.DATA_EVENTO);
+              const isSelected = ev.ID_EVENTO === selectedId;
+              const complementoHtml = ev.COMPLEMENTO_LOCAL
+                ? '<span><i class="bi bi-door-open me-1"></i>' + escapeHtml(ev.COMPLEMENTO_LOCAL) + '</span>'
+                : '';
+              return `
+                <button
+                  type="button"
+                  class="portal-event-item is-active-event ${isSelected ? 'is-selected' : ''} js-btn-select-portal-ev"
+                  data-id="${escapeHtml(ev.ID_EVENTO)}"
+                  aria-pressed="${isSelected ? 'true' : 'false'}"
+                >
+                  <div class="portal-date-tile">
+                    <span class="portal-date-day">${escapeHtml(day)}</span>
+                    <span class="portal-date-month">${escapeHtml(mon)}</span>
+                  </div>
+                  <div class="portal-event-body">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-1">
+                      <span class="badge-ccb-ativo" style="font-size: 0.66rem;">ATIVO &bull; Inscrições Abertas</span>
+                      <i class="bi bi-chevron-right text-primary small"></i>
+                    </div>
+                    <div class="portal-event-title">${escapeHtml(ev.TITULO)}</div>
+                    <div class="portal-event-meta">
+                      <span><i class="bi bi-clock me-1"></i>${formatDateBr(ev.DATA_EVENTO)} &bull; ${escapeHtml(ev.HORA_EVENTO)}h</span>
+                      <span><i class="bi bi-geo-alt me-1"></i>${escapeHtml(ev.LOCAL)}</span>
+                      ${complementoHtml}
+                    </div>
+                  </div>
+                </button>
+              `;
+            })
+            .join('');
+        }
+      }
+
+      if (upcomingListEl) {
+        if (upcomingEvents.length === 0) {
+          upcomingListEl.innerHTML = `
+            <div class="p-3 rounded border border-dashed bg-light text-center small text-secondary" style="border-style: dashed !important;">
+              <i class="bi bi-calendar2-week me-1"></i>
+              Nenhuma reunião futura programada além da agenda atual.
+            </div>
+          `;
+        } else {
+          upcomingListEl.innerHTML = upcomingEvents
+            .map((ev) => {
+              const day = String(ev.DATA_EVENTO || '').slice(8, 10) || '--';
+              const mon = formatShortMonthPtBr(ev.DATA_EVENTO);
+              const complementoHtml = ev.COMPLEMENTO_LOCAL
+                ? '<span><i class="bi bi-door-open me-1"></i>' + escapeHtml(ev.COMPLEMENTO_LOCAL) + '</span>'
+                : '';
+              return `
+                <div class="portal-event-item is-upcoming-disabled" aria-disabled="true" title="Evento previsto: inscrições serão abertas futuramente.">
+                  <div class="portal-date-tile">
+                    <span class="portal-date-day">${escapeHtml(day)}</span>
+                    <span class="portal-date-month">${escapeHtml(mon)}</span>
+                  </div>
+                  <div class="portal-event-body">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-1">
+                      <span class="badge-ccb-previsto" style="font-size: 0.66rem;">
+                        <i class="bi bi-lock-fill me-1"></i>PREVISTO &bull; Em Breve
+                      </span>
+                    </div>
+                    <div class="portal-event-title">${escapeHtml(ev.TITULO)}</div>
+                    <div class="portal-event-meta">
+                      <span><i class="bi bi-clock me-1"></i>${formatDateBr(ev.DATA_EVENTO)} &bull; ${escapeHtml(ev.HORA_EVENTO)}h</span>
+                      <span><i class="bi bi-geo-alt me-1"></i>${escapeHtml(ev.LOCAL)}</span>
+                      ${complementoHtml}
+                    </div>
+                  </div>
+                </div>
+              `;
+            })
+            .join('');
+        }
+      }
+    }
+
+    function openPublicInscriptionModal() {
+      const ev = AppState.portal.activeEvent;
+      if (!ev) {
+        toastr.warning('Nenhuma convocação ativa selecionada para inscrição.');
+        return;
+      }
+
+      const summaryEl = document.getElementById('modal-pub-ev-summary');
+      if (summaryEl) {
+        summaryEl.textContent = `${ev.TITULO} • ${formatDateBr(ev.DATA_EVENTO)} às ${ev.HORA_EVENTO}h`;
+      }
+      document.getElementById('pub-id-evento').value = ev.ID_EVENTO;
+
+      const modalEl = document.getElementById('modal-inscricao-publica');
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
     function renderPortalView() {
+      const masterDetail = document.getElementById('portal-master-detail');
       const emptyContainer = document.getElementById('portal-empty-container');
       const activeContainer = document.getElementById('portal-active-container');
       const voucherContainer = document.getElementById('portal-voucher-container');
 
       if (AppState.portal.lastVoucher) {
-        emptyContainer.classList.add('d-none');
-        activeContainer.classList.add('d-none');
+        if (masterDetail) masterDetail.classList.add('d-none');
         voucherContainer.classList.remove('d-none');
         return;
       }
 
       voucherContainer.classList.add('d-none');
+      if (masterDetail) masterDetail.classList.remove('d-none');
+
+      renderPortalSidebarLists();
 
       if (!AppState.portal.hasActiveEvent || !AppState.portal.activeEvent) {
         activeContainer.classList.add('d-none');
@@ -597,26 +876,6 @@
 
       emptyContainer.classList.add('d-none');
       activeContainer.classList.remove('d-none');
-
-      const activeEvents = AppState.portal.activeEvents || [];
-      const multiWrap = document.getElementById('portal-multi-event-selector-wrap');
-      const selectEv = document.getElementById('portal-select-evento');
-
-      if (activeEvents.length > 1 && selectEv) {
-        multiWrap.classList.remove('d-none');
-        const currentSelectedId = AppState.portal.activeEvent.ID_EVENTO;
-        selectEv.innerHTML = activeEvents
-          .map(
-            (ev) =>
-              `<option value="${escapeHtml(ev.ID_EVENTO)}" ${
-                ev.ID_EVENTO === currentSelectedId ? 'selected' : ''
-              }>${escapeHtml(ev.TITULO)} (${formatDateBr(ev.DATA_EVENTO)})</option>`
-          )
-          .join('');
-        initAllSelect2();
-      } else if (multiWrap) {
-        multiWrap.classList.add('d-none');
-      }
 
       populateActiveEventCard(AppState.portal.activeEvent);
     }
@@ -931,10 +1190,23 @@
       if (!ev) return;
       document.getElementById('pub-id-evento').value = ev.ID_EVENTO;
       document.getElementById('portal-ev-titulo').textContent = ev.TITULO || '—';
+      const weekdayEl = document.getElementById('portal-ev-weekday-full');
+      if (weekdayEl) {
+        const w = getWeekdayNamePtBr(ev.DATA_EVENTO);
+        weekdayEl.textContent =
+          w.charAt(0).toUpperCase() + w.slice(1) + ', ' + formatDateBr(ev.DATA_EVENTO);
+      }
       document.getElementById('portal-ev-data').textContent = formatDateBr(ev.DATA_EVENTO);
       document.getElementById('portal-ev-hora').textContent = ev.HORA_EVENTO ? `${ev.HORA_EVENTO}h` : '—';
       document.getElementById('portal-ev-lanche').textContent = ev.HORA_LANCHE ? `${ev.HORA_LANCHE}h` : '—';
       document.getElementById('portal-ev-local').textContent = ev.LOCAL || '—';
+      const portalCompEl = document.getElementById('portal-ev-complemento-local');
+      if (portalCompEl) {
+        const compText = String(ev.COMPLEMENTO_LOCAL || '').trim();
+        const spanEl = portalCompEl.querySelector('span');
+        if (spanEl) spanEl.textContent = compText;
+        portalCompEl.classList.toggle('d-none', !compText);
+      }
 
       const mapLinkEl = document.getElementById('portal-ev-map-link');
       if (mapLinkEl) {
@@ -965,6 +1237,7 @@
         AppState.portal.hasActiveEvent = state.hasActiveEvent;
         AppState.portal.activeEvent = state.activeEvent;
         AppState.portal.activeEvents = state.activeEvents || [];
+        AppState.portal.upcomingEvents = state.upcomingEvents || [];
         AppState.portal.googleSessionMatch = state.googleSessionMatch || null;
         if (state.metadata) {
           AppState.portal.metadata = state.metadata;
@@ -1043,6 +1316,12 @@
           saveDeviceCredential(response.evento.ID_EVENTO, response.inscricao.ID_INSCRICAO);
         }
 
+        const modalInsEl = document.getElementById('modal-inscricao-publica');
+        if (modalInsEl) {
+          const modalInstance = bootstrap.Modal.getInstance(modalInsEl);
+          if (modalInstance) modalInstance.hide();
+        }
+
         AppState.portal.lastVoucher = response;
         renderVoucherScreen(response);
 
@@ -1085,13 +1364,22 @@
       document.getElementById('voucher-nome').textContent = inscricao.NOME_COMPLETO;
       document.getElementById('voucher-cidade').textContent = inscricao.CIDADE;
       document.getElementById('voucher-funcao').textContent = inscricao.FUNCAO;
-      document.getElementById('voucher-email').textContent = inscricao.EMAIL || '—';
-      document.getElementById('voucher-telefone').textContent = inscricao.TELEFONE || '—';
+      document.getElementById('voucher-email').textContent =
+        inscricao.EMAIL || inscricao.EMAIL_MASKED || '—';
+      document.getElementById('voucher-telefone').textContent =
+        inscricao.TELEFONE || inscricao.TELEFONE_MASKED || '—';
       document.getElementById('voucher-evento-titulo').textContent = evento ? evento.TITULO : '—';
       document.getElementById('voucher-evento-data').textContent = evento ? formatDateBr(evento.DATA_EVENTO) : '—';
       document.getElementById('voucher-evento-hora').textContent = evento && evento.HORA_EVENTO ? `${evento.HORA_EVENTO}h` : '—';
       document.getElementById('voucher-evento-lanche').textContent = evento && evento.HORA_LANCHE ? `${evento.HORA_LANCHE}h` : '—';
       document.getElementById('voucher-evento-local').textContent = evento ? evento.LOCAL : '—';
+      const voucherCompEl = document.getElementById('voucher-evento-complemento');
+      if (voucherCompEl) {
+        const compText = evento && evento.COMPLEMENTO_LOCAL ? String(evento.COMPLEMENTO_LOCAL).trim() : '';
+        const spanEl = voucherCompEl.querySelector('span');
+        if (spanEl) spanEl.textContent = compText;
+        voucherCompEl.classList.toggle('d-none', !compText);
+      }
       const voucherMapLink = document.getElementById('voucher-evento-map-link');
       if (voucherMapLink) {
         voucherMapLink.href = resolveEventMapUrl(evento);
@@ -1161,9 +1449,11 @@
       const horaEv = evento && evento.HORA_EVENTO ? `${evento.HORA_EVENTO}h` : '—';
       const lancheEv = evento && evento.HORA_LANCHE ? `${evento.HORA_LANCHE}h` : '—';
       const localEv = evento && evento.LOCAL ? evento.LOCAL : '—';
+      const complementoEv =
+        evento && evento.COMPLEMENTO_LOCAL ? String(evento.COMPLEMENTO_LOCAL).trim() : '';
       const mapUrl = resolveEventMapUrl(evento);
 
-      const message = [
+      const waLines = [
         '*CONGREGAÇÃO CRISTÃ NO BRASIL*',
         '*Agenda CNS — Regional Campinas/SP*',
         `${WA_ICONS.check} *COMPROVANTE DE INSCRIÇÃO E CREDENCIAL QR CODE*`,
@@ -1175,7 +1465,12 @@
         `${WA_ICONS.calendar} *Data:* ${dataEv}`,
         `${WA_ICONS.clock} *Início da Reunião:* ${horaEv}`,
         `${WA_ICONS.coffee} *Lanche / Recepção:* ${lancheEv}`,
-        `${WA_ICONS.loc} *Local:* ${localEv}`,
+        `${WA_ICONS.loc} *Local:* ${localEv}`
+      ];
+      if (complementoEv) {
+        waLines.push(`${WA_ICONS.pin} *Complemento / Sala:* ${complementoEv}`);
+      }
+      waLines.push(
         `${WA_ICONS.map} *Mapa:* ${mapUrl}`,
         '',
         `${WA_ICONS.user} *Participante:* ${inscricao.NOME_COMPLETO}`,
@@ -1188,7 +1483,8 @@
         '',
         `${WA_ICONS.loc} *Link de Auto Check-in Online (no dia da reunião):*`,
         checkinUrl
-      ].join(WA_ICONS.nl);
+      );
+      const message = waLines.join(WA_ICONS.nl);
 
       let phoneWithDdi = normalizeWhatsappPhoneBr(inscricao.TELEFONE);
 
@@ -1271,6 +1567,13 @@
       document.getElementById('sc-ev-data').textContent = formatDateBr(ev.DATA_EVENTO);
       document.getElementById('sc-ev-hora').textContent = ev.HORA_EVENTO ? `${ev.HORA_EVENTO}h` : '—';
       document.getElementById('sc-ev-local').textContent = ev.LOCAL || '—';
+      const scCompWrap = document.getElementById('sc-ev-complemento-wrap');
+      const scCompTextEl = document.getElementById('sc-ev-complemento-local');
+      if (scCompWrap && scCompTextEl) {
+        const compText = String(ev.COMPLEMENTO_LOCAL || '').trim();
+        scCompTextEl.textContent = compText;
+        scCompWrap.classList.toggle('d-none', !compText);
+      }
       const scMapLink = document.getElementById('sc-ev-map-link');
       if (scMapLink) {
         scMapLink.href = resolveEventMapUrl(ev);
@@ -1575,13 +1878,18 @@
       if (bundle.metadata) {
         AppState.portal.metadata = bundle.metadata;
         syncServerClockOffset(bundle.metadata);
+        populateDynamicFuncaoSelects();
       }
 
       const todayIso = getServerTodayIso();
       const activeList = (bundle.eventos || []).filter(
         (ev) => ev.STATUS === 'ATIVO' && ev.DATA_EVENTO >= todayIso
       );
+      const upcomingList = (bundle.eventos || [])
+        .filter((ev) => ev.STATUS === 'PREVISTO' && ev.DATA_EVENTO >= todayIso)
+        .sort((a, b) => (a.DATA_EVENTO || '').localeCompare(b.DATA_EVENTO || ''));
       AppState.portal.activeEvents = activeList;
+      AppState.portal.upcomingEvents = upcomingList;
       AppState.portal.activeEvent = activeList.length > 0 ? activeList[0] : null;
       AppState.portal.hasActiveEvent = activeList.length > 0;
 
@@ -1590,6 +1898,7 @@
       renderDashboardCharts(bundle);
       renderEventosTable(bundle.eventos || []);
       renderInscricoesTable();
+      renderFuncoesAdminSection(bundle.funcoes || []);
     }
 
     /**
@@ -2613,6 +2922,7 @@
         HORA_EVENTO: ev.HORA_EVENTO,
         HORA_LANCHE: ev.HORA_LANCHE,
         LOCAL: ev.LOCAL,
+        COMPLEMENTO_LOCAL: ev.COMPLEMENTO_LOCAL || '',
         LINK_MAPA: resolveEventMapUrl(ev),
         STATUS: ev.STATUS,
         INSCRITOS: ev.TOTAL_INSCRITOS || 0,
@@ -2773,47 +3083,70 @@
 
           return `
             <tr>
-              <td data-label="Reunião">
-                <div class="fw-bold">${escapeHtml(ev.TITULO)}</div>
-                <code class="text-secondary" style="font-size: 0.72rem;">${escapeHtml(ev.ID_EVENTO)}</code>
+              <td data-label="Reunião" class="ccb-mobile-stack-cell">
+                <div class="ccb-cell-val">
+                  <div class="fw-bold">${escapeHtml(ev.TITULO)}</div>
+                  <code class="text-secondary" style="font-size: 0.72rem;">${escapeHtml(ev.ID_EVENTO)}</code>
+                </div>
               </td>
-              <td data-label="Data" class="text-nowrap">${formatDateBr(ev.DATA_EVENTO)}</td>
-              <td data-label="Início" class="text-nowrap">${escapeHtml(ev.HORA_EVENTO)}h</td>
-              <td data-label="Lanche" class="text-nowrap">${escapeHtml(ev.HORA_LANCHE)}h</td>
-              <td data-label="Local">
-                <div>${escapeHtml(ev.LOCAL)}</div>
-                <a
-                  href="${escapeHtml(resolveEventMapUrl(ev))}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="small text-decoration-none no-export-png"
-                  style="color: #033D60; font-size: 0.75rem;"
-                >
-                  <i class="bi bi-geo-alt-fill me-1"></i>Ver no Mapa
-                </a>
+              <td data-label="Data" class="text-nowrap">
+                <div class="ccb-cell-val">${formatDateBr(ev.DATA_EVENTO)}</div>
+              </td>
+              <td data-label="Início" class="text-nowrap">
+                <div class="ccb-cell-val">${escapeHtml(ev.HORA_EVENTO)}h</div>
+              </td>
+              <td data-label="Lanche" class="text-nowrap">
+                <div class="ccb-cell-val">${escapeHtml(ev.HORA_LANCHE)}h</div>
+              </td>
+              <td data-label="Local" class="ccb-mobile-stack-cell">
+                <div class="ccb-cell-val">
+                  <div>${escapeHtml(ev.LOCAL)}</div>
+                  ${
+                    ev.COMPLEMENTO_LOCAL
+                      ? '<div class="small text-secondary"><i class="bi bi-door-open me-1"></i>' +
+                        escapeHtml(ev.COMPLEMENTO_LOCAL) +
+                        '</div>'
+                      : ''
+                  }
+                  <a
+                    href="${escapeHtml(resolveEventMapUrl(ev))}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="small text-decoration-none no-export-png"
+                    style="color: #033D60; font-size: 0.75rem;"
+                  >
+                    <i class="bi bi-geo-alt-fill me-1"></i>Ver no Mapa
+                  </a>
+                </div>
               </td>
               <td data-label="Inscritos / Presentes" class="text-center">
-                <span class="fw-bold">${ev.TOTAL_INSCRITOS || 0}</span> inscr. /
-                <span class="fw-bold" style="color: #438E76;">${ev.TOTAL_PRESENTES || 0}</span> pres.
+                <div class="ccb-cell-val">
+                  <span class="fw-bold">${ev.TOTAL_INSCRITOS || 0}</span> inscr. /
+                  <span class="fw-bold" style="color: #438E76;">${ev.TOTAL_PRESENTES || 0}</span> pres.
+                </div>
               </td>
-              <td data-label="Status" class="text-center">${statusBadge}</td>
-              <td data-label="Ações" class="text-end text-nowrap no-export-png">
+              <td data-label="Status" class="text-center">
+                <div class="ccb-cell-val">${statusBadge}</div>
+              </td>
+              <td data-label="Ações" class="text-end text-nowrap no-export-png ccb-mobile-stack-cell">
                 <div class="btn-group btn-group-sm">
                   <button
                     type="button"
                     class="btn btn-success js-btn-whatsapp-evento"
                     data-id="${escapeHtml(ev.ID_EVENTO)}"
                     title="Enviar Convite de Inscrição no Grupo de WhatsApp (CNS - Campinas)"
+                    aria-label="Enviar Convite de Inscrição no Grupo de WhatsApp (CNS - Campinas)"
                   >
-                    <i class="bi bi-whatsapp me-1"></i>WhatsApp
+                    <i class="bi bi-whatsapp"></i>
                   </button>
                   <button
                     type="button"
                     class="btn btn-ccb-success js-btn-poster-evento"
                     data-id="${escapeHtml(ev.ID_EVENTO)}"
                     title="Gerar QR Code e Link de Auto-Credenciamento do Evento"
+                    aria-label="Gerar QR Code e Link de Auto-Credenciamento do Evento"
                   >
-                    <i class="bi bi-qr-code me-1"></i>QR Code do Evento
+                    <i class="bi bi-qr-code"></i>
                   </button>
                   <button
                     type="button"
@@ -2861,9 +3194,19 @@
       const checkinLink = `${baseUrl}?view=checkin&evento=${encodeURIComponent(evento.ID_EVENTO)}`;
 
       document.getElementById('poster-ev-titulo').textContent = evento.TITULO;
-      document.getElementById('poster-ev-info').textContent = `Data: ${formatDateBr(
+      const posterInfoEl = document.getElementById('poster-ev-info');
+      posterInfoEl.textContent = `Data: ${formatDateBr(
         evento.DATA_EVENTO
       )} • Reunião: ${evento.HORA_EVENTO}h • Local: ${evento.LOCAL}`;
+      const posterCompEl = document.getElementById('poster-ev-complemento');
+      if (posterCompEl) {
+        const compText = String(evento.COMPLEMENTO_LOCAL || '').trim();
+        const spanEl = posterCompEl.querySelector('span');
+        if (spanEl) spanEl.textContent = compText;
+        posterCompEl.classList.toggle('d-none', !compText);
+        posterInfoEl.classList.toggle('mb-1', Boolean(compText));
+        posterInfoEl.classList.toggle('mb-3', !compText);
+      }
       document.getElementById('poster-ev-link').value = checkinLink;
 
       const qrBox = document.getElementById('poster-qr-canvas');
@@ -2900,25 +3243,32 @@
       const horaReuniao = evento.HORA_EVENTO || '—';
       const horaLanche = evento.HORA_LANCHE || '—';
       const local = evento.LOCAL || '—';
+      const complementoLocal = String(evento.COMPLEMENTO_LOCAL || '').trim();
       const mapUrl = resolveEventMapUrl(evento);
       const portalUrl = `${getWebAppBaseUrl()}?view=portal`;
 
       if (templateType === 'LEMBRETE') {
-        return [
+        const lembreteLines = [
           'A Paz de Deus a todos, meus caros irmãos.',
           '',
           `Peço a gentileza de confirmação da presença para reunião da CNS do dia *${dataBr}* (${diaSemana}, às *${horaReuniao}h*).`,
-          `${WA_ICONS.loc} *Local:* ${local}`,
+          `${WA_ICONS.loc} *Local:* ${local}`
+        ];
+        if (complementoLocal) {
+          lembreteLines.push(`${WA_ICONS.pin} *Complemento / Sala:* ${complementoLocal}`);
+        }
+        lembreteLines.push(
           `${WA_ICONS.coffee} *Serviço de Alimentação / Lanche:* ${horaLanche}h`,
           `${WA_ICONS.map} *Mapa:* ${mapUrl}`,
           '*(Motivo: preparação da alimentação)*',
           '',
           `${WA_ICONS.point} *Confirme sua presença e emita sua credencial pelo link:*`,
           portalUrl
-        ].join(WA_ICONS.nl);
+        );
+        return lembreteLines.join(WA_ICONS.nl);
       }
 
-      return [
+      const fullLines = [
         '*CONGREGAÇÃO CRISTÃ NO BRASIL*',
         '*COMISSÃO DE NEGOCIADORES DE SUPRIMENTOS — CNS*',
         '*REGIONAL ADMINISTRATIVA DE CAMPINAS/SP — RAC*',
@@ -2934,7 +3284,12 @@
         '',
         `${WA_ICONS.calendar} *Dia:* ${dataBr} (${diaSemana}, às *${horaReuniao}h*)`,
         `${WA_ICONS.coffee} *Serviço de Alimentação / Lanche:* ${horaLanche}h`,
-        `${WA_ICONS.loc} *Local:* ${local}`,
+        `${WA_ICONS.loc} *Local:* ${local}`
+      ];
+      if (complementoLocal) {
+        fullLines.push(`${WA_ICONS.pin} *Complemento / Sala:* ${complementoLocal}`);
+      }
+      fullLines.push(
         `${WA_ICONS.map} *Localização (Mapa):* ${mapUrl}`,
         '',
         `${WA_ICONS.point} *Confirmação de Presença / Inscrição Online (para preparação da alimentação e emissão do QR Code):*`,
@@ -2944,7 +3299,8 @@
         'Vossos irmãos em Cristo que vos saúdam.',
         '',
         '*Coordenação da CNS da Regional Administrativa de Campinas*'
-      ].join(WA_ICONS.nl);
+      );
+      return fullLines.join(WA_ICONS.nl);
     }
 
     /**
@@ -2995,6 +3351,8 @@
         document.getElementById('ev-hora').value = evento.HORA_EVENTO;
         document.getElementById('ev-lanche').value = evento.HORA_LANCHE;
         document.getElementById('ev-local').value = evento.LOCAL || DEFAULT_EVENTO_LOCAL;
+        const compInput = document.getElementById('ev-complemento-local');
+        if (compInput) compInput.value = evento.COMPLEMENTO_LOCAL || '';
         if (linkMapaEl) linkMapaEl.value = evento.LINK_MAPA || '';
         jQuery('#ev-status').val(evento.STATUS).trigger('change');
       } else {
@@ -3002,6 +3360,8 @@
         form.reset();
         document.getElementById('ev-id').value = '';
         document.getElementById('ev-local').value = DEFAULT_EVENTO_LOCAL;
+        const compInput = document.getElementById('ev-complemento-local');
+        if (compInput) compInput.value = '';
         if (linkMapaEl) linkMapaEl.value = '';
         jQuery('#ev-status').val('ATIVO').trigger('change');
       }
@@ -3057,6 +3417,11 @@
         HORA_EVENTO: document.getElementById('ev-hora').value.trim(),
         HORA_LANCHE: document.getElementById('ev-lanche').value.trim(),
         LOCAL: document.getElementById('ev-local').value.trim(),
+        COMPLEMENTO_LOCAL: (
+          (document.getElementById('ev-complemento-local') &&
+            document.getElementById('ev-complemento-local').value) ||
+          ''
+        ).trim(),
         LINK_MAPA: linkMapaEl ? linkMapaEl.value.trim() : '',
         STATUS: jQuery('#ev-status').val() || 'ATIVO'
       };
@@ -3268,23 +3633,37 @@
 
           return `
             <tr>
-              <td data-label="Participante">
-                <div class="fw-bold">${escapeHtml(ins.NOME_COMPLETO)}</div>
-                <code class="text-secondary" style="font-size: 0.72rem;">${escapeHtml(ins.ID_INSCRICAO)}</code>
+              <td data-label="Participante" class="ccb-mobile-stack-cell">
+                <div class="ccb-cell-val">
+                  <div class="fw-bold">${escapeHtml(ins.NOME_COMPLETO)}</div>
+                  <code class="text-secondary" style="font-size: 0.72rem;">${escapeHtml(ins.ID_INSCRICAO)}</code>
+                </div>
               </td>
-              <td data-label="Cidade">${escapeHtml(ins.CIDADE)}</td>
-              <td data-label="Função">${escapeHtml(ins.FUNCAO)}</td>
-              <td data-label="Reunião">
-                <div class="small fw-bold">${escapeHtml(ins.EVENTO_TITULO)}</div>
-                <div class="text-secondary" style="font-size: 0.72rem;">${formatDateBr(ins.EVENTO_DATA)}</div>
+              <td data-label="Cidade">
+                <div class="ccb-cell-val">${escapeHtml(ins.CIDADE)}</div>
               </td>
-              <td data-label="Contato" class="small no-export-png no-print">
-                <div><i class="bi bi-envelope text-secondary me-1"></i>${escapeHtml(ins.EMAIL || '—')}</div>
-                <div><i class="bi bi-telephone text-secondary me-1"></i>${escapeHtml(ins.TELEFONE || '—')}</div>
+              <td data-label="Função">
+                <div class="ccb-cell-val">${escapeHtml(ins.FUNCAO)}</div>
               </td>
-              <td data-label="LGPD" class="text-center">${lgpdBadge}</td>
-              <td data-label="Presença" class="text-center">${presencaBadge}</td>
-              <td data-label="Ações" class="text-end text-nowrap no-export-png">
+              <td data-label="Reunião" class="ccb-mobile-stack-cell">
+                <div class="ccb-cell-val">
+                  <div class="small fw-bold">${escapeHtml(ins.EVENTO_TITULO)}</div>
+                  <div class="text-secondary" style="font-size: 0.72rem;">${formatDateBr(ins.EVENTO_DATA)}</div>
+                </div>
+              </td>
+              <td data-label="Contato" class="small no-export-png no-print ccb-mobile-stack-cell">
+                <div class="ccb-cell-val">
+                  <div><i class="bi bi-envelope text-secondary me-1"></i>${escapeHtml(ins.EMAIL || '—')}</div>
+                  <div><i class="bi bi-telephone text-secondary me-1"></i>${escapeHtml(ins.TELEFONE || '—')}</div>
+                </div>
+              </td>
+              <td data-label="LGPD" class="text-center">
+                <div class="ccb-cell-val">${lgpdBadge}</div>
+              </td>
+              <td data-label="Presença" class="text-center">
+                <div class="ccb-cell-val">${presencaBadge}</div>
+              </td>
+              <td data-label="Ações" class="text-end text-nowrap no-export-png ccb-mobile-stack-cell">
                 <div class="btn-group btn-group-sm">
                   <button
                     type="button"
@@ -3512,11 +3891,350 @@
     }
 
     /* ========================================================================
-     * ABA 4: TERMINAL DE CHECK-IN (RECEPÇÃO VIA CÂMERA HTML5-QRCODE)
+     * ABA 4: GESTÃO DE FUNÇÕES E MINISTÉRIOS (CRUD DINÂMICO)
      * ======================================================================== */
+    const FUNCAO_TIPO_BADGE_MAP = {
+      'CNS / Suprimentos': { cls: 'badge-fn-cns', icon: 'bi-briefcase-fill' },
+      'Ministério': { cls: 'badge-fn-ministerio', icon: 'bi-book-fill' },
+      'Administração / Estatutário': { cls: 'badge-fn-admin', icon: 'bi-bank2' },
+      'Música': { cls: 'badge-fn-musica', icon: 'bi-music-note-beamed' },
+      'Colaborador': { cls: 'badge-fn-colab', icon: 'bi-people-fill' },
+      'Outros': { cls: 'badge-fn-outros', icon: 'bi-tag-fill' }
+    };
+
+    function getFuncaoTipoBadgeHtml(tipo) {
+      const cleanTipo = String(tipo || 'Outros').trim();
+      const meta = FUNCAO_TIPO_BADGE_MAP[cleanTipo] || FUNCAO_TIPO_BADGE_MAP['Outros'];
+      return `<span class="badge-fn-tipo ${meta.cls}"><i class="bi ${meta.icon}"></i>${escapeHtml(cleanTipo)}</span>`;
+    }
+
+    function renderFuncoesAdminSection(funcoesInput) {
+      const lista = Array.isArray(funcoesInput)
+        ? funcoesInput
+        : (AppState.admin.bundle && AppState.admin.bundle.funcoes) || [];
+
+      const total = lista.length;
+      const countCns = lista.filter((f) => f.TIPO === 'CNS / Suprimentos').length;
+      const countMin = lista.filter((f) => f.TIPO === 'Ministério').length;
+      const countAdm = lista.filter((f) => f.TIPO === 'Administração / Estatutário').length;
+      const countColab = lista.filter(
+        (f) => f.TIPO === 'Colaborador' || f.TIPO === 'Música' || f.TIPO === 'Outros'
+      ).length;
+      const countAtivas = lista.filter((f) => Boolean(f.ATIVO)).length;
+
+      const setKpi = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(val);
+      };
+      setKpi('kpi-fn-total', total);
+      setKpi('kpi-fn-cns', countCns);
+      setKpi('kpi-fn-ministerio', countMin);
+      setKpi('kpi-fn-admin', countAdm);
+      setKpi('kpi-fn-colab', countColab);
+      setKpi('kpi-fn-ativas', countAtivas);
+
+      const tbody = document.getElementById('admin-funcoes-tbody');
+      if (!tbody) return;
+
+      const searchEl = document.getElementById('fn-filter-search');
+      const tipoEl = document.getElementById('fn-filter-tipo');
+      const statusEl = document.getElementById('fn-filter-status');
+
+      const searchTerm = searchEl ? searchEl.value.trim().toLowerCase() : '';
+      const filterTipo = tipoEl ? tipoEl.value : 'ALL';
+      const filterStatus = statusEl ? statusEl.value : 'ALL';
+
+      const filtradas = lista.filter((fn) => {
+        if (filterTipo !== 'ALL' && fn.TIPO !== filterTipo) return false;
+        if (filterStatus === 'ATIVO' && !fn.ATIVO) return false;
+        if (filterStatus === 'INATIVO' && fn.ATIVO) return false;
+        if (searchTerm) {
+          const matchId = String(fn.FUNCAO_ID || '').toLowerCase().includes(searchTerm);
+          const matchNome = String(fn.FUNCAO || '').toLowerCase().includes(searchTerm);
+          const matchTipo = String(fn.TIPO || '').toLowerCase().includes(searchTerm);
+          if (!matchId && !matchNome && !matchTipo) return false;
+        }
+        return true;
+      });
+
+      if (filtradas.length === 0) {
+        tbody.innerHTML =
+          '<tr><td colspan="5" class="text-center text-secondary py-4">Nenhuma função localizada para o filtro selecionado.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtradas
+        .map((fn) => {
+          const isAtivo = Boolean(fn.ATIVO);
+          const statusHtml = isAtivo
+            ? '<span class="badge-ccb-ativo"><i class="bi bi-check-circle-fill me-1"></i>Ativa</span>'
+            : '<span class="badge-ccb-encerrado"><i class="bi bi-slash-circle me-1"></i>Inativa</span>';
+          const toggleTitle = isAtivo
+            ? 'Desativar função para novas inscrições'
+            : 'Ativar função para novas inscrições';
+          const toggleIcon = isAtivo ? 'bi-slash-circle' : 'bi-check-circle';
+          const toggleCls = isAtivo ? 'btn-outline-warning' : 'btn-outline-success';
+
+          return `
+            <tr>
+              <td data-label="Código" class="text-nowrap">
+                <div class="ccb-cell-val">
+                  <span class="fn-code-pill">${escapeHtml(fn.FUNCAO_ID)}</span>
+                </div>
+              </td>
+              <td data-label="Função / Ministério" class="ccb-mobile-stack-cell">
+                <div class="ccb-cell-val fw-bold">${escapeHtml(fn.FUNCAO)}</div>
+              </td>
+              <td data-label="Classificação">
+                <div class="ccb-cell-val">${getFuncaoTipoBadgeHtml(fn.TIPO)}</div>
+              </td>
+              <td data-label="Status" class="text-center">
+                <div class="ccb-cell-val">${statusHtml}</div>
+              </td>
+              <td data-label="Ações" class="text-end text-nowrap no-export-png ccb-mobile-stack-cell">
+                <div class="btn-group btn-group-sm">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary js-btn-edit-funcao"
+                    data-id="${escapeHtml(fn.FUNCAO_ID)}"
+                    title="Editar Função"
+                    aria-label="Editar Função"
+                  >
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn ${toggleCls} js-btn-toggle-funcao"
+                    data-id="${escapeHtml(fn.FUNCAO_ID)}"
+                    data-nome="${escapeHtml(fn.FUNCAO)}"
+                    data-ativo="${isAtivo ? 'true' : 'false'}"
+                    title="${toggleTitle}"
+                    aria-label="${toggleTitle}"
+                  >
+                    <i class="bi ${toggleIcon}"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger js-btn-delete-funcao"
+                    data-id="${escapeHtml(fn.FUNCAO_ID)}"
+                    data-nome="${escapeHtml(fn.FUNCAO)}"
+                    title="Excluir Função"
+                    aria-label="Excluir Função"
+                  >
+                    <i class="bi bi-trash3-fill"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+
+    function openFuncaoModal(funcao = null) {
+      const form = document.getElementById('form-modal-funcao');
+      if (!form) return;
+      FormAccessibilityBridge.resetFormValidation(form);
+      populateDynamicFuncaoSelects();
+
+      const modalTitle = document.getElementById('modal-funcao-label');
+      const codePreview = document.getElementById('fn-codigo-preview');
+
+      if (funcao) {
+        modalTitle.innerHTML = '<i class="bi bi-pencil-square me-2"></i>Editar Função / Ministério';
+        document.getElementById('fn-id').value = funcao.FUNCAO_ID || '';
+        if (codePreview) codePreview.textContent = funcao.FUNCAO_ID || '—';
+        document.getElementById('fn-nome').value = funcao.FUNCAO || '';
+        const tipoEl = document.getElementById('fn-tipo');
+        if (tipoEl) {
+          const tipoVal = funcao.TIPO || 'Outros';
+          if (!Array.from(tipoEl.options).some((opt) => opt.value === tipoVal)) {
+            const opt = document.createElement('option');
+            opt.value = tipoVal;
+            opt.textContent = tipoVal;
+            tipoEl.appendChild(opt);
+          }
+          tipoEl.value = tipoVal;
+        }
+        document.getElementById('fn-ativo').value = funcao.ATIVO ? 'true' : 'false';
+      } else {
+        modalTitle.innerHTML = '<i class="bi bi-person-vcard-fill me-2"></i>Cadastrar Nova Função';
+        form.reset();
+        document.getElementById('fn-id').value = '';
+        if (codePreview) codePreview.textContent = 'Gerado automaticamente';
+        document.getElementById('fn-ativo').value = 'true';
+      }
+
+      const modalEl = document.getElementById('modal-funcao');
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function handleSaveFuncaoSubmit(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!FormAccessibilityBridge.validateFormAll(form)) {
+        toastr.warning('Preencha todos os campos obrigatórios da função.');
+        return;
+      }
+
+      const payload = {
+        FUNCAO_ID: document.getElementById('fn-id').value.trim(),
+        FUNCAO: document.getElementById('fn-nome').value.trim(),
+        TIPO: document.getElementById('fn-tipo').value,
+        ATIVO: document.getElementById('fn-ativo').value === 'true'
+      };
+
+      const btnSave = document.getElementById('btn-save-funcao');
+      const prevHtml = btnSave.innerHTML;
+      btnSave.disabled = true;
+      btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
+
+      try {
+        const res = await runGas(
+          'apiAdminSaveFuncao',
+          AppState.admin.secret,
+          payload,
+          AppState.admin.filterEventoId
+        );
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-funcao')).hide();
+        toastr.success(res.message || 'Função salva com sucesso!');
+        if (res.bundle) {
+          applyAdminBundle(res.bundle);
+        }
+      } catch (err) {
+        toastr.error(err.message || 'Não foi possível salvar a função.');
+      } finally {
+        btnSave.disabled = false;
+        btnSave.innerHTML = prevHtml;
+      }
+    }
+
+    async function handleToggleFuncaoStatus(funcaoId, nome, currentAtivo) {
+      const nextAtivo = !currentAtivo;
+      try {
+        const res = await runGas(
+          'apiAdminToggleFuncaoStatus',
+          AppState.admin.secret,
+          funcaoId,
+          nextAtivo,
+          AppState.admin.filterEventoId
+        );
+        toastr.success(res.message || 'Status da função atualizado.');
+        if (res.bundle) {
+          applyAdminBundle(res.bundle);
+        }
+      } catch (err) {
+        toastr.error(err.message || 'Não foi possível alterar o status da função.');
+      }
+    }
+
+    async function handleDeleteFuncao(funcaoId, nome) {
+      const confirm = await Swal.fire({
+        icon: 'warning',
+        title: 'Excluir Função?',
+        html: `Deseja remover a função <strong>"${escapeHtml(nome)}"</strong> (<code>${escapeHtml(
+          funcaoId
+        )}</code>)?<br><span class="small text-secondary">Observação: funções que já possuem inscrições registradas devem apenas ser desativadas para preservar os relatórios.</span>`,
+        showCancelButton: true,
+        confirmButtonColor: '#DC3C00',
+        confirmButtonText: 'Sim, excluir',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!confirm.isConfirmed) return;
+
+      try {
+        const res = await runGas(
+          'apiAdminDeleteFuncao',
+          AppState.admin.secret,
+          funcaoId,
+          AppState.admin.filterEventoId
+        );
+        toastr.success(res.message || 'Função removida com sucesso.');
+        if (res.bundle) {
+          applyAdminBundle(res.bundle);
+        }
+      } catch (err) {
+        Swal.fire({
+          icon: 'info',
+          title: 'Não foi possível excluir',
+          text: err.message || 'Erro ao tentar excluir a função.',
+          confirmButtonColor: '#033D60'
+        });
+      }
+    }
+
+    async function handleSeedFuncoesInstitucionais() {
+      const confirm = await Swal.fire({
+        icon: 'question',
+        title: 'Carga Institucional CCB',
+        html: 'Deseja importar o catálogo complementar de funções eclesiásticas, estatutárias, música e colaboradores?<br><span class="small text-secondary">As funções já cadastradas não serão duplicadas.</span>',
+        showCancelButton: true,
+        confirmButtonColor: '#033D60',
+        confirmButtonText: 'Importar Catálogo',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!confirm.isConfirmed) return;
+
+      const btn = document.getElementById('btn-seed-funcoes');
+      const prevHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importando...';
+      }
+
+      try {
+        const res = await runGas(
+          'apiAdminSeedFuncoesInstitucionais',
+          AppState.admin.secret,
+          AppState.admin.filterEventoId
+        );
+        toastr.success(res.message || 'Catálogo institucional atualizado.');
+        if (res.bundle) {
+          applyAdminBundle(res.bundle);
+        }
+      } catch (err) {
+        toastr.error(err.message || 'Erro ao executar a carga institucional.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = prevHtml;
+        }
+      }
+    }
+
+    /* ========================================================================
+     * ABA 5: TERMINAL DE CHECK-IN (RECEPÇÃO VIA CÂMERA HTML5-QRCODE + FOTO NATIVA)
+     * ======================================================================== */
+    function initCheckinEnvironmentHints() {
+      const ua = (navigator && navigator.userAgent) ? navigator.userAgent : '';
+      const isInAppBrowser = /WhatsApp|FBAN|FBAV|Instagram|Line|MicroMessenger|; wv\)/i.test(ua);
+      const alertBox = document.getElementById('checkin-webview-alert');
+      if (alertBox) {
+        alertBox.classList.toggle('d-none', !isInAppBrowser);
+      }
+
+      const helpBox = document.getElementById('scanner-permission-help');
+      if (helpBox) {
+        helpBox.classList.add('d-none');
+      }
+    }
+
+    function showScannerPermissionHelp(show) {
+      const helpBox = document.getElementById('scanner-permission-help');
+      if (helpBox) {
+        helpBox.classList.toggle('d-none', !show);
+      }
+    }
+
     async function detectAvailableCameras() {
       if (!window.Html5Qrcode) {
         toastr.error('Biblioteca html5-qrcode não carregada.');
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showScannerPermissionHelp(true);
+        toastr.warning('Câmera ao vivo indisponível neste navegador/iframe. Utilize o botão "Ler QR por Foto / Câmera".');
         return;
       }
 
@@ -3526,10 +4244,12 @@
         if (!selectCam) return;
 
         if (!devices || devices.length === 0) {
+          showScannerPermissionHelp(true);
           toastr.warning('Nenhuma câmera detectada neste dispositivo.');
           return;
         }
 
+        showScannerPermissionHelp(false);
         selectCam.innerHTML =
           '<option value="environment">Câmera Traseira / Padrão</option>' +
           devices
@@ -3543,12 +4263,13 @@
         initAllSelect2();
         toastr.info(`${devices.length} câmera(s) localizada(s).`);
       } catch (err) {
-        toastr.warning('Permissão de câmera necessária para listar os dispositivos de vídeo.');
+        showScannerPermissionHelp(true);
+        toastr.warning('Permissão de câmera bloqueada ou indisponível no iframe. Use "Ler QR por Foto" ou abra no navegador.');
       }
     }
 
     /**
-     * Inicia o leitor de QR Code em tempo real via html5-qrcode.
+     * Inicia o leitor de QR Code em tempo real via html5-qrcode com fallback progressivo para celulares.
      */
     async function startQrScanner() {
       if (!window.Html5Qrcode) {
@@ -3560,6 +4281,12 @@
         return;
       }
 
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showScannerPermissionHelp(true);
+        toastr.warning('Câmera em tempo real indisponível aqui. Use o botão "Ler QR por Foto / Câmera".');
+        return;
+      }
+
       const viewport = document.getElementById('qr-reader-viewport');
       viewport.innerHTML = '';
 
@@ -3567,28 +4294,45 @@
       AppState.admin.scanner.instance = html5QrCode;
 
       const selectedCam = jQuery('#checkin-select-camera').val() || 'environment';
-      const cameraConfig =
-        selectedCam === 'environment' ? { facingMode: 'environment' } : selectedCam;
+      const candidateConfigs = [];
+      if (selectedCam && selectedCam !== 'environment') {
+        candidateConfigs.push(selectedCam);
+      }
+      candidateConfigs.push({ facingMode: { ideal: 'environment' } });
+      candidateConfigs.push({ facingMode: 'environment' });
+      candidateConfigs.push({ facingMode: 'user' });
 
-      try {
-        const dynamicQrBox = (viewfinderWidth, viewfinderHeight) => {
-          const minEdge = Math.min(viewfinderWidth || 280, viewfinderHeight || 280);
-          const boxSize = Math.max(150, Math.min(230, Math.floor(minEdge * 0.72)));
-          return { width: boxSize, height: boxSize };
-        };
+      const dynamicQrBox = (viewfinderWidth, viewfinderHeight) => {
+        const minEdge = Math.min(viewfinderWidth || 280, viewfinderHeight || 280);
+        const boxSize = Math.max(150, Math.min(230, Math.floor(minEdge * 0.72)));
+        return { width: boxSize, height: boxSize };
+      };
 
-        await html5QrCode.start(
-          cameraConfig,
-          {
-            fps: 10,
-            qrbox: dynamicQrBox
-          },
-          (decodedText) => {
-            handleQrCodeScanned(decodedText);
-          },
-          () => {}
-        );
+      let started = false;
+      let lastError = null;
 
+      for (const camConfig of candidateConfigs) {
+        try {
+          await html5QrCode.start(
+            camConfig,
+            {
+              fps: 10,
+              qrbox: dynamicQrBox
+            },
+            (decodedText) => {
+              handleQrCodeScanned(decodedText);
+            },
+            () => {}
+          );
+          started = true;
+          break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (started) {
+        showScannerPermissionHelp(false);
         AppState.admin.scanner.isRunning = true;
         document.getElementById('btn-start-scanner').classList.add('d-none');
         document.getElementById('btn-stop-scanner').classList.remove('d-none');
@@ -3597,8 +4341,85 @@
         badge.className = 'badge badge-ccb-ativo';
         badge.textContent = 'Câmera Ativa (Lendo QR Code)';
         toastr.info('Leitor óptico de QR Code iniciado.');
+        return;
+      }
+
+      try {
+        await html5QrCode.clear();
+      } catch (_ignore) {}
+
+      showScannerPermissionHelp(true);
+      const errName = (lastError && lastError.name) ? String(lastError.name) : '';
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+        toastr.error('Permissão da câmera negada ou bloqueada pelo iframe. Utilize "Ler QR por Foto / Câmera" logo abaixo.');
+      } else {
+        toastr.error('Não foi possível abrir a câmera ao vivo. Use "Ler QR por Foto / Câmera" ou verifique as permissões.');
+      }
+    }
+
+    /**
+     * Decodifica QR Code a partir de uma foto tirada com a câmera nativa do celular ou imagem da galeria.
+     * Contorna bloqueios de stream WebRTC em iframes/WebViews.
+     */
+    async function handleQrPhotoFileSelected(file) {
+      if (!file) return;
+
+      const btnPhoto = document.getElementById('btn-scan-qr-photo');
+      const btnGallery = document.getElementById('btn-scan-qr-gallery');
+      if (btnPhoto) btnPhoto.disabled = true;
+      if (btnGallery) btnGallery.disabled = true;
+
+      try {
+        let decodedText = '';
+
+        // 1. Tenta BarcodeDetector nativo (Chrome/Android/Edge recentes)
+        if ('BarcodeDetector' in window && typeof window.createImageBitmap === 'function') {
+          try {
+            const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+            const bitmap = await window.createImageBitmap(file);
+            const barcodes = await detector.detect(bitmap);
+            if (bitmap && typeof bitmap.close === 'function') {
+              bitmap.close();
+            }
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+              decodedText = String(barcodes[0].rawValue).trim();
+            }
+          } catch (_nativeErr) {
+            // Fallback para Html5Qrcode
+          }
+        }
+
+        // 2. Fallback universal com Html5Qrcode.scanFile
+        if (!decodedText && window.Html5Qrcode) {
+          if (AppState.admin.scanner.isRunning) {
+            await stopQrScanner();
+          }
+          const viewport = document.getElementById('qr-reader-viewport');
+          const qrInstance = new Html5Qrcode('qr-reader-viewport');
+          try {
+            decodedText = await qrInstance.scanFile(file, false);
+          } finally {
+            try {
+              await qrInstance.clear();
+            } catch (_ignoreClear) {}
+            if (viewport) {
+              viewport.innerHTML =
+                '<div class="small text-light text-center p-4"><i class="bi bi-qr-code-scan d-block fs-2 mb-2 text-info"></i>Foto processada. Use a câmera ao vivo ou tire outra foto para continuar.</div>';
+            }
+          }
+        }
+
+        if (decodedText) {
+          toastr.success('QR Code identificado na imagem!');
+          await handleQrCodeScanned(decodedText);
+        } else {
+          toastr.warning('Nenhum QR Code nítido foi encontrado na imagem. Aproxime mais e tente novamente.');
+        }
       } catch (err) {
-        toastr.error('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
+        toastr.warning('Não foi possível ler o QR Code nesta foto. Tente enquadrar melhor o código com boa iluminação.');
+      } finally {
+        if (btnPhoto) btnPhoto.disabled = false;
+        if (btnGallery) btnGallery.disabled = false;
       }
     }
 
@@ -3825,7 +4646,43 @@
       document.getElementById('btn-nav-admin').addEventListener('click', () => switchView('admin'));
       document.getElementById('btn-empty-go-admin').addEventListener('click', () => switchView('admin'));
       document.getElementById('btn-admin-back-portal').addEventListener('click', () => switchView('portal'));
-      document.getElementById('btn-refresh-portal').addEventListener('click', refreshPortalState);
+
+      const btnRefreshPortal = document.getElementById('btn-refresh-portal');
+      if (btnRefreshPortal) {
+        btnRefreshPortal.addEventListener('click', refreshPortalState);
+      }
+      const btnEmptyRefreshPortal = document.getElementById('btn-empty-refresh-portal');
+      if (btnEmptyRefreshPortal) {
+        btnEmptyRefreshPortal.addEventListener('click', refreshPortalState);
+      }
+
+      const btnOpenInscricao = document.getElementById('btn-portal-open-inscricao');
+      if (btnOpenInscricao) {
+        btnOpenInscricao.addEventListener('click', openPublicInscriptionModal);
+      }
+
+      // Seleção de reunião ativa na lista Master-Detail do Portal Público
+      const portalActiveList = document.getElementById('portal-active-list');
+      if (portalActiveList) {
+        portalActiveList.addEventListener('click', (e) => {
+          const btnEv = e.target.closest('.js-btn-select-portal-ev');
+          if (!btnEv) return;
+          const selectedId = btnEv.getAttribute('data-id');
+          const found = (AppState.portal.activeEvents || []).find((ev) => ev.ID_EVENTO === selectedId);
+          if (!found) return;
+
+          AppState.portal.activeEvent = found;
+          renderPortalSidebarLists();
+          populateActiveEventCard(found);
+
+          if (window.innerWidth < 992) {
+            const detailPanel = document.getElementById('portal-event-detail-panel');
+            if (detailPanel && typeof detailPanel.scrollIntoView === 'function') {
+              detailPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        });
+      }
 
       // Atalhos entre Portal e Auto Check-in Online
       document.getElementById('btn-portal-goto-selfcheckin').addEventListener('click', () => {
@@ -3867,16 +4724,6 @@
         document.getElementById('sc-auto-detected-box').classList.add('d-none');
         document.getElementById('sc-manual-form-box').classList.remove('d-none');
         document.getElementById('sc-email').focus();
-      });
-
-      // Mudança de reunião ativa no Portal Público (quando há mais de uma ativa)
-      jQuery('#portal-select-evento').on('change', function () {
-        const selectedId = jQuery(this).val();
-        const found = (AppState.portal.activeEvents || []).find((e) => e.ID_EVENTO === selectedId);
-        if (found) {
-          AppState.portal.activeEvent = found;
-          populateActiveEventCard(found);
-        }
       });
 
       // Máscara de telefone nos inputs de inscrição completa e auto check-in
@@ -4254,10 +5101,125 @@
         }
       });
 
+      // Gestão de Funções e Ministérios (CRUD)
+      const btnNovaFuncao = document.getElementById('btn-nova-funcao');
+      if (btnNovaFuncao) {
+        btnNovaFuncao.addEventListener('click', () => openFuncaoModal(null));
+      }
+
+      const btnSeedFuncoes = document.getElementById('btn-seed-funcoes');
+      if (btnSeedFuncoes) {
+        btnSeedFuncoes.addEventListener('click', handleSeedFuncoesInstitucionais);
+      }
+
+      const formModalFuncao = document.getElementById('form-modal-funcao');
+      if (formModalFuncao) {
+        formModalFuncao.addEventListener('submit', handleSaveFuncaoSubmit);
+      }
+
+      const fnSearchInput = document.getElementById('fn-filter-search');
+      if (fnSearchInput) {
+        fnSearchInput.addEventListener('input', () => renderFuncoesAdminSection());
+      }
+      const fnTipoFilter = document.getElementById('fn-filter-tipo');
+      if (fnTipoFilter) {
+        fnTipoFilter.addEventListener('change', () => renderFuncoesAdminSection());
+      }
+      const fnStatusFilter = document.getElementById('fn-filter-status');
+      if (fnStatusFilter) {
+        fnStatusFilter.addEventListener('change', () => renderFuncoesAdminSection());
+      }
+
+      const funcoesTbody = document.getElementById('admin-funcoes-tbody');
+      if (funcoesTbody) {
+        funcoesTbody.addEventListener('click', (e) => {
+          const btnEdit = e.target.closest('.js-btn-edit-funcao');
+          if (btnEdit) {
+            const id = btnEdit.getAttribute('data-id');
+            const found =
+              AppState.admin.bundle &&
+              (AppState.admin.bundle.funcoes || []).find((f) => f.FUNCAO_ID === id);
+            if (found) openFuncaoModal(found);
+            return;
+          }
+
+          const btnToggle = e.target.closest('.js-btn-toggle-funcao');
+          if (btnToggle) {
+            handleToggleFuncaoStatus(
+              btnToggle.getAttribute('data-id'),
+              btnToggle.getAttribute('data-nome'),
+              btnToggle.getAttribute('data-ativo') === 'true'
+            );
+            return;
+          }
+
+          const btnDel = e.target.closest('.js-btn-delete-funcao');
+          if (btnDel) {
+            handleDeleteFuncao(btnDel.getAttribute('data-id'), btnDel.getAttribute('data-nome'));
+          }
+        });
+      }
+
+      // Abas do Admin: rolar aba selecionada suavemente para área visível no mobile
+      const adminTabsEl = document.getElementById('adminTabs');
+      if (adminTabsEl) {
+        adminTabsEl.addEventListener('shown.bs.tab', (e) => {
+          if (e.target && typeof e.target.scrollIntoView === 'function') {
+            e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+          }
+          if (e.target && e.target.id === 'tab-btn-checkin') {
+            initCheckinEnvironmentHints();
+          }
+        });
+      }
+
       // Controles do Terminal de Check-in (Recepção)
       document.getElementById('btn-start-scanner').addEventListener('click', startQrScanner);
       document.getElementById('btn-stop-scanner').addEventListener('click', stopQrScanner);
       document.getElementById('btn-detect-cameras').addEventListener('click', detectAvailableCameras);
+
+      const btnScanPhoto = document.getElementById('btn-scan-qr-photo');
+      const inputScanPhoto = document.getElementById('checkin-qr-file-input');
+      if (btnScanPhoto && inputScanPhoto) {
+        btnScanPhoto.addEventListener('click', () => {
+          inputScanPhoto.value = '';
+          inputScanPhoto.click();
+        });
+        inputScanPhoto.addEventListener('change', (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) {
+            handleQrPhotoFileSelected(file);
+          }
+        });
+      }
+
+      const btnScanGallery = document.getElementById('btn-scan-qr-gallery');
+      const inputScanGallery = document.getElementById('checkin-qr-gallery-input');
+      if (btnScanGallery && inputScanGallery) {
+        btnScanGallery.addEventListener('click', () => {
+          inputScanGallery.value = '';
+          inputScanGallery.click();
+        });
+        inputScanGallery.addEventListener('change', (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) {
+            handleQrPhotoFileSelected(file);
+          }
+        });
+      }
+
+      const btnCopyCheckinUrl = document.getElementById('btn-copy-checkin-app-url');
+      if (btnCopyCheckinUrl) {
+        btnCopyCheckinUrl.addEventListener('click', async () => {
+          const url = `${getWebAppBaseUrl()}?view=admin`;
+          try {
+            await navigator.clipboard.writeText(url);
+            toastr.success('Link do Painel copiado! Cole no Chrome ou Safari.');
+          } catch (_copyErr) {
+            prompt('Copie o link abaixo e abra no Chrome/Safari:', url);
+          }
+        });
+      }
 
       document.getElementById('checkin-manual-uuid').addEventListener('click', () => {});
       document.getElementById('btn-checkin-manual-submit').addEventListener('click', () => {
@@ -4301,8 +5263,11 @@
       AppState.portal.hasActiveEvent = Boolean(boot.hasActiveEvent);
       AppState.portal.activeEvent = boot.activeEvent || null;
       AppState.portal.activeEvents = boot.activeEvents || [];
+      AppState.portal.upcomingEvents = boot.upcomingEvents || [];
       AppState.portal.googleSessionMatch = boot.googleSessionMatch || null;
 
+      initResponsiveNavbar();
+      initCheckinEnvironmentHints();
       populateStaticSelectOptions();
       bindDomEvents();
 

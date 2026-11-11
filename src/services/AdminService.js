@@ -147,6 +147,15 @@ class AdminService {
       valores: funcoesEntries.map((entry) => entry[1])
     };
 
+    const funcoesCatalogo = this.repository_
+      .findAllFuncoes()
+      .sort((a, b) => (a.FUNCAO || '').localeCompare(b.FUNCAO || '', 'pt-BR'));
+    const activeFuncaoNames = funcoesCatalogo.filter((f) => f.ATIVO).map((f) => f.FUNCAO);
+    const publicMetadata = {
+      ...Environment.getPublicMetadata(),
+      funcoes: activeFuncaoNames
+    };
+
     return {
       filterEventoId: normalizedFilter,
       kpis: {
@@ -160,9 +169,10 @@ class AdminService {
         funcoes: chartFuncoes
       },
       eventos: eventosEnriquecidos,
+      funcoes: funcoesCatalogo,
       inscricoes: todasInscricoes,
       inscricoesFiltradas,
-      metadata: Environment.getPublicMetadata(),
+      metadata: publicMetadata,
       generatedAt: SecurityUtils.getCurrentIsoTimestamp()
     };
   }
@@ -213,6 +223,11 @@ class AdminService {
       throw new Error('O local/endereço da reunião é obrigatório.');
     }
 
+    const complementoLocal = SecurityUtils.sanitizeText(
+      eventPayload.COMPLEMENTO_LOCAL || eventPayload.complementoLocal || '',
+      240
+    );
+
     const rawLinkMapa = String(eventPayload.LINK_MAPA || eventPayload.linkMapa || '').trim();
     let linkMapa = '';
     if (rawLinkMapa) {
@@ -243,7 +258,8 @@ class AdminService {
       HORA_LANCHE: horaLanche,
       LOCAL: local,
       STATUS: status,
-      LINK_MAPA: linkMapa
+      LINK_MAPA: linkMapa,
+      COMPLEMENTO_LOCAL: complementoLocal
     };
   }
 
@@ -588,6 +604,180 @@ class AdminService {
       message: `Check-in confirmado com sucesso para ${updated.NOME_COMPLETO} (${updated.CIDADE})!`,
       inscricao: updated,
       evento
+    };
+  }
+
+  /* ==========================================================================
+   * GESTÃO DE FUNÇÕES / MINISTÉRIOS (CRUD)
+   * ========================================================================== */
+
+  /**
+   * Valida e normaliza os campos de criação/edição de uma função institucional.
+   * @param {Object} funcaoPayload Dados informados no formulário.
+   * @returns {{FUNCAO_ID: string, FUNCAO: string, TIPO: string, ATIVO: boolean}}
+   * @private
+   */
+  validateFuncaoPayload_(funcaoPayload) {
+    if (!funcaoPayload || typeof funcaoPayload !== 'object') {
+      throw new Error('Dados da função não informados.');
+    }
+
+    const funcaoId = SecurityUtils.sanitizeText(
+      funcaoPayload.FUNCAO_ID || funcaoPayload.funcaoId || '',
+      40
+    ).toUpperCase();
+
+    const funcao = SecurityUtils.sanitizeText(
+      funcaoPayload.FUNCAO || funcaoPayload.funcao || '',
+      120
+    );
+    if (!funcao || funcao.length < 2) {
+      throw new Error('O nome da função/ministério é obrigatório (mínimo de 2 caracteres).');
+    }
+
+    const rawTipo = SecurityUtils.sanitizeText(
+      funcaoPayload.TIPO || funcaoPayload.tipo || 'Outros',
+      60
+    );
+    const tipo = Environment.TIPOS_FUNCAO.includes(rawTipo) ? rawTipo : rawTipo || 'Outros';
+
+    const ativo =
+      funcaoPayload.ATIVO !== undefined
+        ? SecurityUtils.parseBoolean(funcaoPayload.ATIVO)
+        : true;
+
+    return {
+      FUNCAO_ID: funcaoId,
+      FUNCAO: funcao,
+      TIPO: tipo,
+      ATIVO: ativo
+    };
+  }
+
+  /**
+   * Cria ou atualiza uma função no catálogo dinâmico (aba FUNCOES).
+   * @param {string} adminSecret Chave administrativa.
+   * @param {Object} funcaoPayload Dados da função.
+   * @returns {{success: boolean, message: string, funcao: Object}}
+   */
+  saveFuncao(adminSecret, funcaoPayload) {
+    SecurityUtils.assertAdminAuthorized(adminSecret);
+    this.repository_.ensureDatabaseSchema();
+
+    const normalized = this.validateFuncaoPayload_(funcaoPayload);
+    const normName = SecurityUtils.normalizeSearchText(normalized.FUNCAO);
+
+    const saved = this.repository_.runInTransaction(() => {
+      const allFuncoes = this.repository_.findAllFuncoes();
+      const duplicate = allFuncoes.find(
+        (item) =>
+          SecurityUtils.normalizeSearchText(item.FUNCAO) === normName &&
+          (!normalized.FUNCAO_ID || item.FUNCAO_ID.toUpperCase() !== normalized.FUNCAO_ID)
+      );
+      if (duplicate) {
+        throw new Error(
+          `Já existe uma função cadastrada com o nome "${duplicate.FUNCAO}" (${duplicate.FUNCAO_ID}).`
+        );
+      }
+
+      if (normalized.FUNCAO_ID) {
+        return this.repository_.updateFuncaoById(normalized.FUNCAO_ID, {
+          FUNCAO: normalized.FUNCAO,
+          TIPO: normalized.TIPO,
+          ATIVO: normalized.ATIVO
+        });
+      }
+
+      return this.repository_.insertFuncao({
+        FUNCAO: normalized.FUNCAO,
+        TIPO: normalized.TIPO,
+        ATIVO: normalized.ATIVO
+      });
+    });
+
+    return {
+      success: true,
+      message: normalized.FUNCAO_ID
+        ? `Função "${saved.FUNCAO}" (${saved.FUNCAO_ID}) atualizada com sucesso!`
+        : `Função "${saved.FUNCAO}" (${saved.FUNCAO_ID}) cadastrada com sucesso!`,
+      funcao: saved
+    };
+  }
+
+  /**
+   * Ativa ou desativa uma função do catálogo sem perder histórico.
+   * @param {string} adminSecret Chave administrativa.
+   * @param {string} funcaoId Código FUNCAO_ID.
+   * @param {boolean} ativo Novo estado booleano.
+   * @returns {{success: boolean, message: string, funcao: Object}}
+   */
+  toggleFuncaoStatus(adminSecret, funcaoId, ativo) {
+    SecurityUtils.assertAdminAuthorized(adminSecret);
+    this.repository_.ensureDatabaseSchema();
+
+    const updated = this.repository_.updateFuncaoById(funcaoId, {
+      ATIVO: Boolean(ativo)
+    });
+
+    return {
+      success: true,
+      message: updated.ATIVO
+        ? `Função "${updated.FUNCAO}" ativada e disponível para inscrições.`
+        : `Função "${updated.FUNCAO}" desativada para novas inscrições.`,
+      funcao: updated
+    };
+  }
+
+  /**
+   * Remove uma função do catálogo caso não haja inscrições vinculadas a ela.
+   * @param {string} adminSecret Chave administrativa.
+   * @param {string} funcaoId Código FUNCAO_ID.
+   * @returns {{success: boolean, message: string}}
+   */
+  deleteFuncao(adminSecret, funcaoId) {
+    SecurityUtils.assertAdminAuthorized(adminSecret);
+    this.repository_.ensureDatabaseSchema();
+
+    const target = this.repository_.findFuncaoById(funcaoId);
+    if (!target) {
+      throw new Error(`Função "${funcaoId}" não encontrada para exclusão.`);
+    }
+
+    const normTargetName = SecurityUtils.normalizeSearchText(target.FUNCAO);
+    const linkedCount = this.repository_
+      .findAllInscricoes()
+      .filter((ins) => SecurityUtils.normalizeSearchText(ins.FUNCAO) === normTargetName).length;
+
+    if (linkedCount > 0) {
+      throw new Error(
+        `Não é possível excluir "${target.FUNCAO}" pois existem ${linkedCount} inscrição(ões) vinculada(s) a ela. Utilize "Desativar" para ocultá-la de novas inscrições preservando os relatórios.`
+      );
+    }
+
+    this.repository_.deleteFuncaoById(funcaoId);
+    return {
+      success: true,
+      message: `Função "${target.FUNCAO}" (${target.FUNCAO_ID}) removida com sucesso.`
+    };
+  }
+
+  /**
+   * Executa a carga complementar institucional da CCB na aba FUNCOES sem duplicar registros.
+   * @param {string} adminSecret Chave administrativa.
+   * @returns {{success: boolean, message: string, addedCount: number}}
+   */
+  seedFuncoesInstitucionais(adminSecret) {
+    SecurityUtils.assertAdminAuthorized(adminSecret);
+    this.repository_.ensureDatabaseSchema();
+
+    const res = this.repository_.seedFuncoesCatalogo(Environment.FUNCOES_CARGA_INSTITUCIONAL);
+    return {
+      success: true,
+      addedCount: res.addedCount,
+      message:
+        res.addedCount > 0
+          ? `Carga Institucional CCB concluída: ${res.addedCount} nova(s) função(ões) adicionada(s).`
+          : 'Todas as funções do catálogo institucional CCB já estão cadastradas.'
     };
   }
 }

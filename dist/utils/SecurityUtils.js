@@ -444,6 +444,20 @@ const SecurityUtils = (() => {
     return false;
   }
 
+  /**
+   * Normaliza texto para comparação sem distinção de maiúsculas, acentos e espaços múltiplos.
+   * @param {string} value Texto original.
+   * @returns {string} Texto normalizado para busca/comparação.
+   */
+  function normalizeSearchText(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+  }
+
   return Object.freeze({
     generateUuid,
     isValidUuid,
@@ -464,6 +478,7 @@ const SecurityUtils = (() => {
     normalizeTimeString,
     isValidDateIso,
     isValidTimeHhMm,
-    parseBoolean
+    parseBoolean,
+    normalizeSearchText
   });
 })();

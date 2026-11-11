@@ -316,11 +316,17 @@ function runTests() {
       HORA_EVENTO: '14:00',
       HORA_LANCHE: '15:20',
       LOCAL: 'Rua Germânia, 661 - Campinas/SP',
+      COMPLEMENTO_LOCAL: 'Salão de Reuniões - 3º andar - Prédio anexo do Bonfim - Campinas.',
       STATUS: 'ATIVO'
     },
     'ALL'
   );
   assert.strictEqual(createEvRes.success, true);
+  assert.strictEqual(
+    createEvRes.evento.COMPLEMENTO_LOCAL,
+    'Salão de Reuniões - 3º andar - Prédio anexo do Bonfim - Campinas.'
+  );
+  assert.strictEqual(createEvRes.evento.LOCAL, 'Rua Germânia, 661 - Campinas/SP');
   const idEventoCriado = createEvRes.evento.ID_EVENTO;
   assert.ok(idEventoCriado && idEventoCriado.length === 36);
 
@@ -362,6 +368,15 @@ function runTests() {
     'ATIVO',
     'ALL'
   );
+  const portalWithUpcoming = gasGlobalContext.apiGetPortalState();
+  assert.strictEqual(portalWithUpcoming.hasActiveEvent, true);
+  assert.strictEqual(
+    portalWithUpcoming.activeEvent.COMPLEMENTO_LOCAL,
+    'Salão de Reuniões - 3º andar - Prédio anexo do Bonfim - Campinas.'
+  );
+  assert.ok(Array.isArray(portalWithUpcoming.upcomingEvents));
+  assert.strictEqual(portalWithUpcoming.upcomingEvents.length, 1);
+  assert.strictEqual(portalWithUpcoming.upcomingEvents[0].ID_EVENTO, evPrevistoRes.evento.ID_EVENTO);
   console.log(`✓ [4/10] Evento único ATIVO e status PREVISTO validados (${idEventoCriado}).`);
 
   // Teste 5: Validação condicional (E-mail OU Telefone: pelo menos um obrigatório) e LGPD
@@ -610,6 +625,12 @@ function runTests() {
   assert.strictEqual(delRes.success, true);
   assert.strictEqual(delRes.bundle.kpis.totalInscricoes, 0);
 
+  // Sem evento ATIVO, o portal deve indicar hasActiveEvent = false mas listar upcomingEvents (PREVISTO)
+  const portalOnlyUpcoming = gasGlobalContext.apiGetPortalState();
+  assert.strictEqual(portalOnlyUpcoming.hasActiveEvent, false);
+  assert.strictEqual(portalOnlyUpcoming.upcomingEvents.length, 1);
+  assert.strictEqual(portalOnlyUpcoming.upcomingEvents[0].STATUS, 'PREVISTO');
+
   // Auditoria estática de segurança/sintaxe no frontend AppScripts.html
   const appScriptsHtml = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'html', 'AppScripts.html'), 'utf8');
   const scriptMatch = appScriptsHtml.match(/<script>([\s\S]*?)<\/script>/);
@@ -630,9 +651,72 @@ function runTests() {
     false,
     'Referência a símbolo exclusivo de backend detectada em AppScripts.html'
   );
-  console.log('✓ [10/10] Deduplicação atômica, lote no Sheets e auditoria estática do frontend aprovados.\n');
+  console.log('✓ [10/10] Deduplicação atômica, lote no Sheets e auditoria estática do frontend aprovados.');
 
-  console.log('Todos os 10 cenários de teste automatizados passaram com sucesso!');
+  // Teste 11: CRUD dinâmico de Funções / Ministérios (aba FUNCOES) + Carga Institucional CCB
+  const funcoesIniciais = gasGlobalContext.apiListarFuncoes();
+  assert.strictEqual(funcoesIniciais.success, true);
+  assert.strictEqual(funcoesIniciais.funcoes.length, 10);
+
+  const novaFnRes = gasGlobalContext.apiAdminSaveFuncao(
+    mockPropertiesStore.ADMIN_SECRET,
+    {
+      FUNCAO: 'Tesoureiro Regional',
+      TIPO: 'Administração / Estatutário',
+      ATIVO: true
+    },
+    'ALL'
+  );
+  assert.strictEqual(novaFnRes.success, true);
+  assert.strictEqual(novaFnRes.funcao.FUNCAO_ID, 'FUNC-1011');
+  assert.strictEqual(novaFnRes.bundle.funcoes.length, 11);
+
+  assert.throws(() => {
+    gasGlobalContext.apiAdminSaveFuncao(
+      mockPropertiesStore.ADMIN_SECRET,
+      {
+        FUNCAO: 'tesoureiro regional',
+        TIPO: 'Administração / Estatutário',
+        ATIVO: true
+      },
+      'ALL'
+    );
+  }, /Já existe uma função cadastrada/);
+
+  const toggleOffFnRes = gasGlobalContext.apiAdminToggleFuncaoStatus(
+    mockPropertiesStore.ADMIN_SECRET,
+    'FUNC-1011',
+    false,
+    'ALL'
+  );
+  assert.strictEqual(toggleOffFnRes.funcao.ATIVO, false);
+  assert.strictEqual(
+    gasGlobalContext.apiListarFuncoes().names.includes('Tesoureiro Regional'),
+    false
+  );
+
+  const delFnRes = gasGlobalContext.apiAdminDeleteFuncao(
+    mockPropertiesStore.ADMIN_SECRET,
+    'FUNC-1011',
+    'ALL'
+  );
+  assert.strictEqual(delFnRes.success, true);
+  assert.strictEqual(delFnRes.bundle.funcoes.length, 10);
+
+  const seedRes = gasGlobalContext.apiAdminSeedFuncoesInstitucionais(
+    mockPropertiesStore.ADMIN_SECRET,
+    'ALL'
+  );
+  assert.strictEqual(seedRes.success, true);
+  assert.ok(seedRes.addedCount >= 15);
+  const secondSeedRes = gasGlobalContext.apiAdminSeedFuncoesInstitucionais(
+    mockPropertiesStore.ADMIN_SECRET,
+    'ALL'
+  );
+  assert.strictEqual(secondSeedRes.addedCount, 0);
+  console.log('✓ [11/11] CRUD completo de Funções e Carga Institucional CCB aprovados.\n');
+
+  console.log('Todos os 11 cenários de teste automatizados passaram com sucesso!');
 }
 
 runTests();

@@ -1,24 +1,31 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agenda CNS | CCB - Regional Campinas/SP</title>
 
   <!-- Bootstrap 5.3 CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    crossorigin="anonymous">
   <!-- Bootstrap Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"
+    crossorigin="anonymous">
   <!-- Select2 CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet"
+    crossorigin="anonymous">
   <!-- SweetAlert2 CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.min.css" rel="stylesheet"
+    crossorigin="anonymous">
   <!-- Toastr CSS -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet"
+    crossorigin="anonymous">
 
   <!-- Identidade Visual Institucional CCB -->
   <?!= include('AppStyles') ?>
 </head>
+
 <body>
   <!-- Overlay Global de Processamento -->
   <div id="global-loading" class="ccb-loading-overlay d-none" role="status" aria-live="polite">
@@ -26,41 +33,53 @@
     <div id="global-loading-text" class="fw-bold">Processando solicitação...</div>
   </div>
 
-  <!-- Cabeçalho Institucional CCB com Logotipos CCB e CNS -->
-  <header class="ccb-navbar py-3 no-print">
+  <!-- Cabeçalho Institucional CCB com Logotipos CCB e CNS e Navegação Responsiva -->
+  <header id="ccb-site-header" class="ccb-navbar no-print">
     <div class="container">
-      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div class="d-flex align-items-center gap-3">
+      <div class="ccb-header-inner">
+        <div class="ccb-header-brand">
           <div class="ccb-brand-logos" aria-label="Logotipos Institucionais CCB e CNS">
-            <img
-              src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+            <img src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
               onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
-              alt="Logotipo CCB"
-              class="ccb-logo-img"
-            >
+              alt="Logotipo CCB" class="ccb-logo-img">
             <span class="ccb-logo-divider" aria-hidden="true"></span>
-            <img
-              src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
+            <img src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
               onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
-              alt="Logotipo CNS"
-              class="ccb-logo-img"
-            >
+              alt="Logotipo CNS" class="ccb-logo-img">
           </div>
-          <div>
+          <div class="ccb-header-titles">
             <h1 class="ccb-navbar-title">Agenda CNS &mdash; Regional Campinas/SP</h1>
-            <p class="ccb-navbar-subtitle">Comissão de Negociadores de Suprimentos &bull; Congregação Cristã no Brasil</p>
+            <p class="ccb-navbar-subtitle">Comissão de Negociadores de Suprimentos &bull; CCB</p>
           </div>
         </div>
-        <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Navegação Principal">
-          <button type="button" id="btn-nav-portal" class="btn btn-sm btn-light fw-bold">
-            <i class="bi bi-calendar2-check me-1"></i>Portal de Convocação
+
+        <nav class="ccb-site-nav" aria-label="Navegação Principal">
+          <button id="btn-nav-menu-toggle" class="ccb-menu-button" type="button" popovertarget="ccb-primary-menu"
+            popovertargetaction="toggle" aria-controls="ccb-primary-menu" aria-expanded="false">
+            <i class="bi bi-list fs-5" aria-hidden="true"></i>
+            <span>Menu</span>
           </button>
-          <button type="button" id="btn-nav-checkin" class="btn btn-sm btn-outline-light fw-bold">
-            <i class="bi bi-phone-vibrate me-1"></i>Auto Check-in Online
-          </button>
-          <button type="button" id="btn-nav-admin" class="btn btn-sm btn-outline-light fw-bold">
-            <i class="bi bi-shield-lock me-1"></i>Painel Administrativo
-          </button>
+
+          <ul id="ccb-primary-menu" class="ccb-site-menu" popover="auto">
+            <li>
+              <button type="button" id="btn-nav-portal" class="ccb-nav-link" aria-current="page">
+                <i class="bi bi-calendar2-check" aria-hidden="true"></i>
+                <span>Portal de Convocação</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" id="btn-nav-checkin" class="ccb-nav-link">
+                <i class="bi bi-phone-vibrate" aria-hidden="true"></i>
+                <span>Auto Check-in</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" id="btn-nav-admin" class="ccb-nav-link">
+                <i class="bi bi-shield-lock" aria-hidden="true"></i>
+                <span>Administrativo</span>
+              </button>
+            </li>
+          </ul>
         </nav>
       </div>
     </div>
@@ -80,291 +99,317 @@
     </div>
 
     <!-- ===================================================================
-         ROTA 1: PORTAL PÚBLICO DE CONVOCAÇÃO E INSCRIÇÃO (view=portal)
+         ROTA 1: PORTAL PÚBLICO MASTER-DETAIL DE CONVOCAÇÕES (view=portal)
          =================================================================== -->
     <section id="view-portal" aria-label="Portal Público de Convocação">
-      <!-- Estado 1.A: Sem Evento Ativo -->
-      <div id="portal-empty-container" class="d-none">
-        <div class="ccb-card mx-auto" style="max-width: 680px;">
-          <div class="ccb-card-header text-center py-3">
-            <h2 class="fs-5"><i class="bi bi-calendar-x me-2"></i>Comunicado Oficial &mdash; Agenda CNS</h2>
-          </div>
-          <div class="p-4 p-md-5 text-center">
-            <div class="ccb-report-logos mb-4">
-              <img
-                src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
-                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
-                alt="Logotipo CCB"
-              >
-              <span class="ccb-logo-divider"></span>
-              <img
-                src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
-                onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
-                alt="Logotipo CNS"
-              >
+      <!-- Estado 1.A/B: Grade Master-Detail (Lista de Eventos à Esquerda + Detalhes à Direita) -->
+      <div id="portal-master-detail">
+        <div class="row g-4 align-items-start">
+          <!-- COLUNA ESQUERDA: LISTA DE EVENTOS (EM EVIDÊNCIA + PRÓXIMOS EVENTOS DESABILITADOS) -->
+          <div class="col-lg-5">
+            <div class="portal-sidebar-card ccb-card">
+              <div class="ccb-card-header d-flex align-items-center justify-content-between gap-2">
+                <div>
+                  <h2 class="fs-6 mb-0"><i class="bi bi-calendar3-week me-2"></i>Agenda de Convocações</h2>
+                </div>
+                <button type="button" id="btn-refresh-portal" class="btn btn-ccb-header-export"
+                  title="Atualizar lista de reuniões">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Atualizar
+                </button>
+              </div>
+
+              <div class="p-3">
+                <!-- Seção 1: Evento Ativo (Em Evidência) -->
+                <div class="portal-section-label">
+                  <span class="portal-live-dot" aria-hidden="true"></span>
+                  <span>Convocação Aberta</span>
+                </div>
+                <div id="portal-active-list" class="d-flex flex-column gap-2 mb-4">
+                </div>
+
+                <!-- Seção 2: Próximos Eventos (Separado e Desabilitado / Apenas Informativo) -->
+                <div id="portal-upcoming-section" class="portal-upcoming-divider pt-3">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-1 mb-2">
+                    <div class="portal-section-label text-secondary mb-0">
+                      <i class="bi bi-calendar-range"></i>
+                      <span>Próximos Eventos</span>
+                    </div>
+                  </div>
+                  <div id="portal-upcoming-list" class="d-flex flex-column gap-2">
+                  </div>
+                </div>
+              </div>
             </div>
-            <h3 class="fs-5 mb-3">Não existem convocações abertas no momento</h3>
-            <p class="text-secondary mb-4 pretty-text">
-              A Paz de Deus. No momento não há reuniões ou convocações ativas agendadas para a
-              <strong>Comissão de Negociadores de Suprimentos (CNS) &mdash; Regional Campinas/SP</strong>.
-              Assim que uma nova reunião for aberta pela coordenação, o formulário de credenciamento estará disponível nesta página.
-            </p>
-            <div class="d-flex justify-content-center gap-2 flex-wrap mobile-stack-buttons">
-              <button type="button" id="btn-refresh-portal" class="btn btn-ccb-primary">
-                <i class="bi bi-arrow-clockwise me-1"></i>Verificar Novamente
-              </button>
-              <button type="button" id="btn-empty-go-admin" class="btn btn-ccb-outline">
-                <i class="bi bi-shield-lock me-1"></i>Acesso Administrativo
-              </button>
+          </div>
+
+          <!-- COLUNA DIREITA: PAINEL ELEGANTE DE DETALHES DA CONVOCAÇÃO SELECIONADA -->
+          <div class="col-lg-7">
+            <div id="portal-event-detail-panel" class="portal-detail-sticky">
+              <!-- Estado Sem Evento Ativo -->
+              <div id="portal-empty-container" class="d-none">
+                <div class="ccb-card">
+                  <div class="portal-detail-hero portal-detail-hero-muted p-4 text-center text-white">
+                    <span class="badge-ccb-previsto mb-2 d-inline-block">AGENDA REGIONAL CAMPINAS/SP</span>
+                    <h2 class="fs-4 text-white mb-1">Nenhuma Convocação Aberta no Momento</h2>
+                    <p class="small mb-0 opacity-75">Comissão de Negociadores de Suprimentos (CNS) &bull; CCB</p>
+                  </div>
+                  <div class="p-4 text-center">
+                    <div class="ccb-report-logos mb-3">
+                      <img src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+                        onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
+                        alt="Logotipo CCB">
+                      <span class="ccb-logo-divider"></span>
+                      <img src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
+                        onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
+                        alt="Logotipo CNS">
+                    </div>
+                    <p class="text-secondary mb-4 pretty-text">
+                      A Paz de Deus. No momento não existem inscrições abertas. Confira ao lado a relação de
+                      <strong>Próximos Eventos (Agenda Prevista)</strong> programados pela coordenação ou clique abaixo
+                      para atualizar.
+                    </p>
+                    <div class="d-flex justify-content-center gap-2 flex-wrap mobile-stack-buttons">
+                      <button type="button" id="btn-empty-refresh-portal" class="btn btn-ccb-primary">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Verificar Novamente
+                      </button>
+                      <button type="button" id="btn-empty-go-admin" class="btn btn-ccb-outline">
+                        <i class="bi bi-shield-lock me-1"></i>Acesso Administrativo
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Estado Com Evento Ativo Selecionado -->
+              <div id="portal-active-container" class="d-none">
+                <div class="ccb-card portal-detail-card">
+                  <!-- Cabeçalho Hero Institucional -->
+                  <div class="portal-detail-hero p-4 text-white">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                      <span class="portal-hero-kicker">
+                        <i class="bi bi-megaphone-fill me-1"></i>CONVOCAÇÃO OFICIAL &bull; REGIONAL CAMPINAS/SP
+                      </span>
+                      <span class="badge-ccb-ativo">INSCRIÇÕES ABERTAS</span>
+                    </div>
+                    <h2 id="portal-ev-titulo" class="fs-3 text-white fw-bold mb-2">—</h2>
+                    <div class="d-flex flex-wrap align-items-center gap-3 small portal-hero-meta">
+                      <span><i class="bi bi-calendar2-event me-1"></i><span id="portal-ev-weekday-full">—</span></span>
+                      <span><i class="bi bi-people-fill me-1"></i>CNS &bull; Congregação Cristã no Brasil</span>
+                    </div>
+                  </div>
+
+                  <div class="p-4">
+                    <!-- Grade de Métricas do Evento -->
+                    <div class="row g-3 mb-3">
+                      <div class="col-6 col-sm-4">
+                        <div class="ccb-info-tile">
+                          <span class="ccb-info-label"><i class="bi bi-calendar-event me-1"></i>Data</span>
+                          <p id="portal-ev-data" class="ccb-info-value">—</p>
+                        </div>
+                      </div>
+                      <div class="col-6 col-sm-4">
+                        <div class="ccb-info-tile">
+                          <span class="ccb-info-label"><i class="bi bi-clock me-1"></i>Reunião</span>
+                          <p id="portal-ev-hora" class="ccb-info-value">—</p>
+                        </div>
+                      </div>
+                      <div class="col-12 col-sm-4">
+                        <div class="ccb-info-tile tile-lanche">
+                          <span class="ccb-info-label"><i class="bi bi-cup-hot me-1"></i>Lanche</span>
+                          <p id="portal-ev-lanche" class="ccb-info-value">—</p>
+                        </div>
+                      </div>
+                      <div class="col-12">
+                        <div class="ccb-info-tile tile-local">
+                          <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                            <div style="min-width: 0; flex: 1 1 220px;">
+                              <span class="ccb-info-label"><i class="bi bi-geo-alt-fill me-1"></i>Local / Endereço
+                                Completo</span>
+                              <p id="portal-ev-local" class="ccb-info-value mb-0">—</p>
+                              <p id="portal-ev-complemento-local" class="small text-secondary fw-semibold mb-0 mt-1 d-none">
+                                <i class="bi bi-door-open me-1"></i><span></span>
+                              </p>
+                            </div>
+                            <a id="portal-ev-map-link" href="#" target="_blank" rel="noopener noreferrer"
+                              class="btn btn-sm btn-ccb-outline d-inline-flex align-items-center gap-1 flex-shrink-0">
+                              <i class="bi bi-map-fill"></i>Abrir no Google Maps
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Orientações de Credenciamento e Janela de Check-in -->
+                    <div class="alert alert-light border small mb-4 pretty-text"
+                      style="border-color: var(--ccb-gray) !important;">
+                      <div class="fw-bold text-primary mb-1" style="color: var(--ccb-primary) !important;">
+                        <i class="bi bi-qr-code-scan me-1"></i>Orientações para Credenciamento
+                      </div>
+                      <ul class="mb-2 ps-3">
+                        <li>Realize sua inscrição antecipada para dimensionamento da recepção e geração do seu
+                          <strong>QR Code individual</strong>.
+                        </li>
+                        <li>No dia da reunião, apresente o QR Code na portaria ou confirme pelo <strong>Auto Check-in
+                            Online</strong> no seu celular.</li>
+                      </ul>
+                      <div id="portal-checkin-window-note" class="pt-2 border-top text-secondary">
+                        <i class="bi bi-clock-history me-1"></i> O check-in de presença é liberado <strong>1 hora
+                          antes</strong> do início da reunião.
+                      </div>
+                    </div>
+
+                    <!-- Botões Principais de Ação do Evento -->
+                    <div class="d-grid gap-2 d-sm-flex mobile-stack-buttons">
+                      <button type="button" id="btn-portal-open-inscricao"
+                        class="btn btn-ccb-primary btn-lg flex-grow-1 fw-bold">
+                        <i class="bi bi-pencil-square me-2"></i>Inscrever-se nesta Reunião
+                      </button>
+                      <button type="button" id="btn-portal-goto-selfcheckin"
+                        class="btn btn-ccb-outline btn-lg fw-semibold">
+                        <i class="bi bi-phone-vibrate me-1"></i>Auto Check-in
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Estado 1.B: Convocação Ativa + Formulário de Inscrição -->
-      <div id="portal-active-container" class="d-none">
-        <div class="row g-4">
-          <!-- Coluna Esquerda: Detalhes da Convocação Oficial -->
-          <div class="col-lg-5">
-            <div class="ccb-card h-100">
-              <div class="ccb-card-header">
-                <div class="d-flex align-items-center justify-content-between">
-                  <h2 class="fs-5"><i class="bi bi-megaphone-fill me-2"></i>Convocação Oficial</h2>
-                  <span class="badge-ccb-ativo">INSCRIÇÕES ABERTAS</span>
-                </div>
+      <!-- MODAL DE INSCRIÇÃO PÚBLICA (Aberto ao clicar em "Inscrever-se nesta Reunião") -->
+      <div class="modal fade" id="modal-inscricao-publica" tabindex="-1" aria-labelledby="modal-pub-ins-label"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content border-0 shadow">
+            <div class="modal-header ccb-card-header">
+              <div>
+                <h3 class="modal-title fs-5 text-white mb-0" id="modal-pub-ins-label">
+                  <i class="bi bi-person-check-fill me-2"></i>Formulário de Inscrição e Credenciamento
+                </h3>
+                <div id="modal-pub-ev-summary" class="small text-light opacity-75 mt-1">—</div>
               </div>
-              <div class="ccb-card-subheader">
-                Regional Campinas/SP &bull; Comissão de Negociadores de Suprimentos
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body p-4">
+              <!-- Aviso de modo Inscrição + Check-in imediato (quando vindo da tela de Auto Check-in) -->
+              <div id="portal-instant-checkin-alert" class="alert alert-success border d-none mb-3 small">
+                <i class="bi bi-check2-circle me-1"></i>
+                <strong>Modo Recepção Ativo:</strong> Ao concluir o preenchimento abaixo, sua inscrição e sua
+                <strong>presença na reunião</strong> já serão confirmadas simultaneamente.
               </div>
-              <div class="p-4">
-                <!-- Seletor de Reunião Ativa (visível quando há múltiplas reuniões ativas futuras) -->
-                <div id="portal-multi-event-selector-wrap" class="mb-3 d-none">
-                  <label for="portal-select-evento" class="form-label">Selecione a Reunião Ativa:</label>
-                  <select id="portal-select-evento" class="form-select js-select2" data-placeholder="Selecione a convocação...">
-                  </select>
-                </div>
 
-                <div class="mb-4">
-                  <span class="ccb-info-label">Título da Reunião / Convocação</span>
-                  <h3 id="portal-ev-titulo" class="fs-4 mb-0" style="color: var(--ccb-primary);">—</h3>
-                </div>
+              <form id="form-inscricao-publica" novalidate>
+                <input type="hidden" id="pub-id-evento" name="ID_EVENTO" value="">
+                <input type="hidden" id="pub-auto-checkin-now" name="AUTO_CHECKIN_NOW" value="false">
 
-                <div class="row g-3 mb-3">
-                  <div class="col-sm-6">
-                    <div class="ccb-info-tile">
-                      <span class="ccb-info-label"><i class="bi bi-calendar-event me-1"></i>Data da Reunião</span>
-                      <p id="portal-ev-data" class="ccb-info-value">—</p>
+                <div class="row g-3">
+                  <!-- Nome Completo (Obrigatório) -->
+                  <div class="col-12">
+                    <label for="pub-nome" class="form-label">
+                      Nome Completo <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" id="pub-nome" name="NOME_COMPLETO" class="form-control"
+                      placeholder="Digite seu nome completo sem abreviações" required minlength="3" maxlength="150"
+                      autocomplete="name" aria-errormessage="err-pub-nome">
+                    <div id="err-pub-nome" class="error-msg">
+                      <span aria-hidden="true">&#9888;</span> Informe seu nome completo (mínimo de 3 caracteres).
                     </div>
                   </div>
-                  <div class="col-sm-6">
-                    <div class="ccb-info-tile">
-                      <span class="ccb-info-label"><i class="bi bi-clock me-1"></i>Início da Reunião</span>
-                      <p id="portal-ev-hora" class="ccb-info-value">—</p>
+
+                  <!-- Cidade (Regional Campinas - Obrigatório) -->
+                  <div class="col-md-6" id="wrap-pub-cidade">
+                    <label for="pub-cidade" class="form-label">
+                      Cidade / Grupo (Regional Campinas) <span class="text-danger">*</span>
+                    </label>
+                    <select id="pub-cidade" name="CIDADE" class="form-select js-select2"
+                      data-placeholder="Selecione a cidade..." required aria-errormessage="err-pub-cidade">
+                      <option value="">Selecione a cidade...</option>
+                    </select>
+                    <div id="err-pub-cidade" class="error-msg">
+                      <span aria-hidden="true">&#9888;</span> Selecione sua Cidade na Regional Campinas.
                     </div>
                   </div>
-                  <div class="col-sm-12">
-                    <div class="ccb-info-tile tile-lanche">
-                      <span class="ccb-info-label"><i class="bi bi-cup-hot me-1"></i>Horário do Lanche / Recepção</span>
-                      <p id="portal-ev-lanche" class="ccb-info-value">—</p>
+
+                  <!-- Função / Ministério na CNS (Obrigatório) -->
+                  <div class="col-md-6" id="wrap-pub-funcao">
+                    <label for="pub-funcao" class="form-label">
+                      Função / Ministério na CNS <span class="text-danger">*</span>
+                    </label>
+                    <select id="pub-funcao" name="FUNCAO" class="form-select js-select2"
+                      data-placeholder="Selecione sua função..." required aria-errormessage="err-pub-funcao">
+                      <option value="">Selecione sua função...</option>
+                    </select>
+                    <div id="err-pub-funcao" class="error-msg">
+                      <span aria-hidden="true">&#9888;</span> Selecione sua Função / Ministério na CNS.
                     </div>
                   </div>
-                  <div class="col-sm-12">
-                    <div class="ccb-info-tile tile-local">
-                      <span class="ccb-info-label"><i class="bi bi-geo-alt-fill me-1"></i>Local / Endereço</span>
-                      <p id="portal-ev-local" class="ccb-info-value mb-2">—</p>
-                      <a
-                        id="portal-ev-map-link"
-                        href="#"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="btn btn-sm btn-ccb-outline d-inline-flex align-items-center gap-1"
-                        style="font-size: 0.78rem; padding: 0.3rem 0.65rem;"
-                      >
-                        <i class="bi bi-map-fill"></i>Abrir Localização no Mapa
-                      </a>
+
+                  <!-- E-mail (Obrigatório E-mail ou Telefone) -->
+                  <div class="col-md-6" id="wrap-pub-email">
+                    <label for="pub-email" class="form-label">
+                      E-mail <span class="text-secondary fw-normal small">(ou Telefone <span
+                          class="text-danger">*</span>)</span>
+                    </label>
+                    <input type="email" id="pub-email" name="EMAIL" class="form-control"
+                      placeholder="seu.email@dominio.com.br" maxlength="160" autocomplete="email"
+                      aria-errormessage="err-pub-email">
+                    <div id="err-pub-email" class="error-msg">
+                      <span aria-hidden="true">&#9888;</span> Informe um e-mail válido ou preencha o telefone ao lado.
+                    </div>
+                  </div>
+
+                  <!-- Telefone / Celular com DDD (Obrigatório E-mail ou Telefone) -->
+                  <div class="col-md-6" id="wrap-pub-telefone">
+                    <label for="pub-telefone" class="form-label">
+                      Telefone / Celular <span class="text-secondary fw-normal small">(ou E-mail <span
+                          class="text-danger">*</span>)</span>
+                    </label>
+                    <input type="tel" id="pub-telefone" name="TELEFONE" class="form-control"
+                      placeholder="(19) 99999-9999" maxlength="20" autocomplete="tel"
+                      aria-errormessage="err-pub-telefone">
+                    <div id="err-pub-telefone" class="error-msg">
+                      <span aria-hidden="true">&#9888;</span> Informe um telefone com DDD ou preencha o e-mail ao lado.
+                    </div>
+                  </div>
+
+                  <!-- Termo Compulsório LGPD -->
+                  <div class="col-12 mt-3">
+                    <div class="lgpd-consent-box" id="wrap-pub-lgpd">
+                      <div class="d-flex align-items-start gap-2">
+                        <label for="pub-lgpd" class="d-flex align-items-start gap-2 mb-0" style="cursor: pointer;">
+                          <input type="checkbox" id="pub-lgpd" name="ACEITE_LGPD" class="ccb-checkbox-native mt-1"
+                            required aria-errormessage="err-pub-lgpd">
+                          <span class="lgpd-text pretty-text">
+                            <strong>Termo de Consentimento LGPD (Lei nº 13.709/2018):</strong> Declaro estar ciente e
+                            concordo
+                            com o tratamento dos meus dados pessoais informados neste formulário para a finalidade
+                            exclusiva de
+                            organização, controle de presença, dimensionamento de recepção e gestão administrativa das
+                            reuniões e
+                            treinamentos da <strong>Comissão de Negociadores de Suprimentos (CNS) da Congregação Cristã
+                              no Brasil (CCB) &mdash; Regional Campinas/SP</strong>,
+                            vedado o compartilhamento com terceiros para fins diversos. <strong
+                              class="text-danger">*</strong>
+                          </span>
+                        </label>
+                      </div>
+                      <div id="err-pub-lgpd" class="error-msg mt-2">
+                        <span aria-hidden="true">&#9888;</span> É obrigatório aceitar o Termo de Consentimento LGPD para
+                        prosseguir.
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div class="alert alert-light border small mb-3 pretty-text" style="border-color: var(--ccb-gray) !important;">
-                  <i class="bi bi-qr-code-scan text-primary me-1"></i>
-                  <strong>Duas Formas de Credenciamento na Reunião:</strong>
-                  <ol class="mb-1 mt-1 ps-3">
-                    <li>Apresente o <strong>QR Code individual</strong> gerado após sua inscrição na recepção; ou</li>
-                    <li>No local da reunião, escaneie o <strong>QR Code do Evento</strong> ou acesse o <strong>Auto Check-in Online</strong> para confirmar sua presença diretamente pelo seu celular.</li>
-                  </ol>
-                  <div id="portal-checkin-window-note" class="mt-2 pt-2 border-top text-secondary">
-                    <i class="bi bi-clock-history me-1"></i> O check-in de presença é liberado <strong>1 hora antes</strong> do início da reunião.
-                  </div>
-                </div>
-
-                <div class="d-grid">
-                  <button type="button" id="btn-portal-goto-selfcheckin" class="btn btn-ccb-outline btn-sm">
-                    <i class="bi bi-phone-vibrate me-1"></i>Já se inscreveu e está no local? Fazer Auto Check-in Online
+                <div class="d-flex flex-wrap justify-content-end gap-2 mt-4 pt-3 border-top mobile-stack-buttons">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="submit" id="btn-submit-inscricao" class="btn btn-ccb-primary">
+                    <i class="bi bi-check2-circle me-2"></i>Confirmar Inscrição e Gerar Credencial QR Code
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Coluna Direita: Formulário de Inscrição e Credenciamento -->
-          <div class="col-lg-7">
-            <div class="ccb-card h-100">
-              <div class="ccb-card-header">
-                <h2 class="fs-5"><i class="bi bi-person-check-fill me-2"></i>Formulário de Inscrição e Credenciamento</h2>
-              </div>
-              <div class="p-4">
-                <!-- Aviso de modo Inscrição + Check-in imediato (quando vindo da tela de Auto Check-in) -->
-                <div id="portal-instant-checkin-alert" class="alert alert-success border d-none mb-3 small">
-                  <i class="bi bi-check2-circle me-1"></i>
-                  <strong>Modo Recepção Ativo:</strong> Ao concluir o preenchimento abaixo, sua inscrição e sua
-                  <strong>presença na reunião</strong> já serão confirmadas simultaneamente.
-                </div>
-
-                <form id="form-inscricao-publica" novalidate>
-                  <input type="hidden" id="pub-id-evento" name="ID_EVENTO" value="">
-                  <input type="hidden" id="pub-auto-checkin-now" name="AUTO_CHECKIN_NOW" value="false">
-
-                  <div class="row g-3">
-                    <!-- Nome Completo (Obrigatório) -->
-                    <div class="col-12">
-                      <label for="pub-nome" class="form-label">
-                        Nome Completo <span class="text-danger">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="pub-nome"
-                        name="NOME_COMPLETO"
-                        class="form-control"
-                        placeholder="Digite seu nome completo sem abreviações"
-                        required
-                        minlength="3"
-                        maxlength="150"
-                        autocomplete="name"
-                        aria-errormessage="err-pub-nome"
-                      >
-                      <div id="err-pub-nome" class="error-msg">
-                        <span aria-hidden="true">&#9888;</span> Informe seu nome completo (mínimo de 3 caracteres).
-                      </div>
-                    </div>
-
-                    <!-- Cidade (Regional Campinas - Obrigatório) -->
-                    <div class="col-md-6" id="wrap-pub-cidade">
-                      <label for="pub-cidade" class="form-label">
-                        Cidade / Grupo (Regional Campinas) <span class="text-danger">*</span>
-                      </label>
-                      <select
-                        id="pub-cidade"
-                        name="CIDADE"
-                        class="form-select js-select2"
-                        data-placeholder="Selecione a cidade..."
-                        required
-                        aria-errormessage="err-pub-cidade"
-                      >
-                        <option value="">Selecione a cidade...</option>
-                      </select>
-                      <div id="err-pub-cidade" class="error-msg">
-                        <span aria-hidden="true">&#9888;</span> Selecione sua Cidade na Regional Campinas.
-                      </div>
-                    </div>
-
-                    <!-- Função / Ministério na CNS (Obrigatório) -->
-                    <div class="col-md-6" id="wrap-pub-funcao">
-                      <label for="pub-funcao" class="form-label">
-                        Função / Ministério na CNS <span class="text-danger">*</span>
-                      </label>
-                      <select
-                        id="pub-funcao"
-                        name="FUNCAO"
-                        class="form-select js-select2"
-                        data-placeholder="Selecione sua função..."
-                        required
-                        aria-errormessage="err-pub-funcao"
-                      >
-                        <option value="">Selecione sua função...</option>
-                      </select>
-                      <div id="err-pub-funcao" class="error-msg">
-                        <span aria-hidden="true">&#9888;</span> Selecione sua Função / Ministério na CNS.
-                      </div>
-                    </div>
-
-                    <!-- E-mail (Obrigatório E-mail ou Telefone) -->
-                    <div class="col-md-6" id="wrap-pub-email">
-                      <label for="pub-email" class="form-label">
-                        E-mail <span class="text-secondary fw-normal small">(ou Telefone <span class="text-danger">*</span>)</span>
-                      </label>
-                      <input
-                        type="email"
-                        id="pub-email"
-                        name="EMAIL"
-                        class="form-control"
-                        placeholder="seu.email@dominio.com.br"
-                        maxlength="160"
-                        autocomplete="email"
-                        aria-errormessage="err-pub-email"
-                      >
-                      <div id="err-pub-email" class="error-msg">
-                        <span aria-hidden="true">&#9888;</span> Informe um e-mail válido ou preencha o telefone ao lado.
-                      </div>
-                    </div>
-
-                    <!-- Telefone / Celular com DDD (Obrigatório E-mail ou Telefone) -->
-                    <div class="col-md-6" id="wrap-pub-telefone">
-                      <label for="pub-telefone" class="form-label">
-                        Telefone / Celular <span class="text-secondary fw-normal small">(ou E-mail <span class="text-danger">*</span>)</span>
-                      </label>
-                      <input
-                        type="tel"
-                        id="pub-telefone"
-                        name="TELEFONE"
-                        class="form-control"
-                        placeholder="(19) 99999-9999"
-                        maxlength="20"
-                        autocomplete="tel"
-                        aria-errormessage="err-pub-telefone"
-                      >
-                      <div id="err-pub-telefone" class="error-msg">
-                        <span aria-hidden="true">&#9888;</span> Informe um telefone com DDD ou preencha o e-mail ao lado.
-                      </div>
-                    </div>
-
-                    <!-- Termo Compulsório LGPD -->
-                    <div class="col-12 mt-3">
-                      <div class="lgpd-consent-box" id="wrap-pub-lgpd">
-                        <div class="d-flex align-items-start gap-2">
-                          <label for="pub-lgpd" class="d-flex align-items-start gap-2 mb-0" style="cursor: pointer;">
-                            <input
-                              type="checkbox"
-                              id="pub-lgpd"
-                              name="ACEITE_LGPD"
-                              class="ccb-checkbox-native mt-1"
-                              required
-                              aria-errormessage="err-pub-lgpd"
-                            >
-                            <span class="lgpd-text pretty-text">
-                              <strong>Termo de Consentimento LGPD (Lei nº 13.709/2018):</strong> Declaro estar ciente e concordo
-                              com o tratamento dos meus dados pessoais informados neste formulário para a finalidade exclusiva de
-                              organização, controle de presença, dimensionamento de recepção e gestão administrativa das reuniões e
-                              treinamentos da <strong>Comissão de Negociadores de Suprimentos (CNS) da Congregação Cristã no Brasil (CCB) &mdash; Regional Campinas/SP</strong>,
-                              vedado o compartilhamento com terceiros para fins diversos. <strong class="text-danger">*</strong>
-                            </span>
-                          </label>
-                        </div>
-                        <div id="err-pub-lgpd" class="error-msg mt-2">
-                          <span aria-hidden="true">&#9888;</span> É obrigatório aceitar o Termo de Consentimento LGPD para prosseguir.
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Botão de Envio -->
-                    <div class="col-12 mt-4 d-grid">
-                      <button type="submit" id="btn-submit-inscricao" class="btn btn-ccb-primary btn-lg">
-                        <i class="bi bi-check2-circle me-2"></i>Confirmar Inscrição e Gerar Credencial QR Code
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
+              </form>
             </div>
           </div>
         </div>
@@ -375,17 +420,13 @@
         <div class="qr-voucher-container shadow-sm">
           <div class="text-center border-bottom pb-3 mb-3" style="border-color: var(--ccb-gray) !important;">
             <div class="ccb-report-logos mb-3">
-              <img
-                src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+              <img src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
                 onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
-                alt="Logotipo CCB"
-              >
+                alt="Logotipo CCB">
               <span class="ccb-logo-divider"></span>
-              <img
-                src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
+              <img src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
                 onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
-                alt="Logotipo CNS"
-              >
+                alt="Logotipo CNS">
             </div>
             <div>
               <span id="voucher-status-badge" class="badge-ccb-ativo mb-2 d-inline-block">CREDENCIAL EMITIDA</span>
@@ -443,16 +484,13 @@
               <div class="col-12">
                 <span class="text-secondary d-block">Local:</span>
                 <strong id="voucher-evento-local">—</strong>
-                <a
-                  id="voucher-evento-map-link"
-                  href="#"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="ms-2 small fw-bold text-decoration-none no-print"
-                  style="color: var(--ccb-primary);"
-                >
+                <a id="voucher-evento-map-link" href="#" target="_blank" rel="noopener noreferrer"
+                  class="ms-2 small fw-bold text-decoration-none no-print" style="color: var(--ccb-primary);">
                   <i class="bi bi-geo-alt-fill me-1"></i>Ver no Mapa
                 </a>
+                <div id="voucher-evento-complemento" class="small text-secondary fw-semibold mt-1 d-none">
+                  <i class="bi bi-door-open me-1"></i><span></span>
+                </div>
               </div>
               <div class="col-12 border-top pt-2 mt-2 text-secondary" style="font-size: 0.75rem;">
                 <div>Consentimento LGPD registrado em: <span id="voucher-lgpd-timestamp">—</span></div>
@@ -517,30 +555,29 @@
                     <i class="bi bi-calendar-event me-1"></i><span id="sc-ev-data">—</span> &bull;
                     <i class="bi bi-clock me-1"></i>Reunião: <span id="sc-ev-hora">—</span> &bull;
                     <i class="bi bi-geo-alt me-1"></i><span id="sc-ev-local">—</span>
-                    <a
-                      id="sc-ev-map-link"
-                      href="#"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="ms-1 fw-bold text-decoration-none"
-                      style="color: var(--ccb-primary);"
-                    >
+                    <a id="sc-ev-map-link" href="#" target="_blank" rel="noopener noreferrer"
+                      class="ms-1 fw-bold text-decoration-none" style="color: var(--ccb-primary);">
                       (<i class="bi bi-map-fill me-1"></i>Mapa)
                     </a>
+                  </div>
+                  <div id="sc-ev-complemento-wrap" class="small text-secondary fw-semibold mt-1 d-none">
+                    <i class="bi bi-door-open me-1"></i><span id="sc-ev-complemento-local"></span>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- 0. Aviso de Bloqueio de Janela de Check-in (Até 1h antes do início da reunião) -->
-            <div id="sc-locked-window-box" class="alert alert-warning border mb-0 p-4 text-center d-none" style="border-color: var(--ccb-yellow) !important; background-color: #FFFDF5;">
+            <div id="sc-locked-window-box" class="alert alert-warning border mb-0 p-4 text-center d-none"
+              style="border-color: var(--ccb-yellow) !important; background-color: #FFFDF5;">
               <i class="bi bi-clock-history display-5 d-block mb-2" style="color: var(--ccb-primary);"></i>
               <span class="badge-ccb-pendente mb-2 d-inline-block">CHECK-IN AGUARDANDO HORÁRIO DE LIBERAÇÃO</span>
               <h4 class="fs-5 mb-2" style="color: var(--ccb-primary);">
                 Credenciamento de Presença Liberado 1 Hora Antes da Reunião
               </h4>
               <p id="sc-locked-window-msg" class="small text-secondary mb-3 pretty-text">
-                O check-in de presença para esta reunião estará disponível a partir de 1 hora antes do início programado.
+                O check-in de presença para esta reunião estará disponível a partir de 1 hora antes do início
+                programado.
               </p>
               <div class="bg-white border rounded p-3 mb-3 mx-auto" style="max-width: 440px;">
                 <span class="ccb-info-label mb-1">Abertura do Check-in de Presença</span>
@@ -585,7 +622,8 @@
                 <i class="bi bi-shield-check text-primary me-1"></i>Confirmação por E-mail ou Telefone
               </h4>
               <p class="small text-secondary mb-3 pretty-text">
-                Selecione por qual dado deseja validar sua inscrição (<strong>E-mail</strong> ou <strong>Telefone/Celular</strong>) e preencha o campo ao lado para confirmar sua presença:
+                Selecione por qual dado deseja validar sua inscrição (<strong>E-mail</strong> ou
+                <strong>Telefone/Celular</strong>) e preencha o campo ao lado para confirmar sua presença:
               </p>
 
               <form id="form-self-checkin" novalidate>
@@ -604,14 +642,8 @@
                     <label for="sc-email" class="form-label">
                       E-mail da Inscrição <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="email"
-                      id="sc-email"
-                      class="form-control"
-                      placeholder="Digite o e-mail cadastrado..."
-                      autocomplete="email"
-                      aria-errormessage="err-sc-email"
-                    >
+                    <input type="email" id="sc-email" class="form-control" placeholder="Digite o e-mail cadastrado..."
+                      autocomplete="email" aria-errormessage="err-sc-email">
                     <div id="err-sc-email" class="error-msg">
                       <span aria-hidden="true">&#9888;</span> Informe um endereço de e-mail válido.
                     </div>
@@ -621,17 +653,11 @@
                     <label for="sc-telefone" class="form-label">
                       Telefone / Celular com DDD <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="tel"
-                      id="sc-telefone"
-                      class="form-control"
-                      placeholder="(19) 99999-9999"
-                      maxlength="20"
-                      autocomplete="tel"
-                      aria-errormessage="err-sc-telefone"
-                    >
+                    <input type="tel" id="sc-telefone" class="form-control" placeholder="(19) 99999-9999" maxlength="20"
+                      autocomplete="tel" aria-errormessage="err-sc-telefone">
                     <div id="err-sc-telefone" class="error-msg">
-                      <span aria-hidden="true">&#9888;</span> Informe o telefone/celular completo com DDD cadastrado na inscrição.
+                      <span aria-hidden="true">&#9888;</span> Informe o telefone/celular completo com DDD cadastrado na
+                      inscrição.
                     </div>
                   </div>
 
@@ -674,19 +700,15 @@
           <div class="p-4">
             <form id="form-admin-login" novalidate>
               <div class="mb-3">
-                <label for="admin-secret-input" class="form-label">Chave Mestra Administrativa (<code class="text-dark">ADMIN_SECRET</code>)</label>
+                <label for="admin-secret-input" class="form-label">Chave Mestra Administrativa (<code
+                    class="text-dark">ADMIN_SECRET</code>)</label>
                 <div class="input-group">
                   <span class="input-group-text bg-light"><i class="bi bi-key-fill text-primary"></i></span>
-                  <input
-                    type="password"
-                    id="admin-secret-input"
-                    class="form-control"
-                    placeholder="Informe a chave mestra..."
-                    required
-                    autocomplete="current-password"
-                    aria-errormessage="err-admin-secret"
-                  >
-                  <button type="button" id="btn-toggle-secret-vis" class="btn btn-outline-secondary" title="Mostrar/Ocultar Chave">
+                  <input type="password" id="admin-secret-input" class="form-control"
+                    placeholder="Informe a chave mestra..." required autocomplete="current-password"
+                    aria-errormessage="err-admin-secret">
+                  <button type="button" id="btn-toggle-secret-vis" class="btn btn-outline-secondary"
+                    title="Mostrar/Ocultar Chave">
                     <i class="bi bi-eye"></i>
                   </button>
                 </div>
@@ -719,50 +741,60 @@
             </p>
           </div>
           <div class="ccb-report-logos">
-            <img
-              src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+            <img src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
               onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
-              alt="Logotipo CCB"
-            >
+              alt="Logotipo CCB">
             <span class="ccb-logo-divider"></span>
-            <img
-              src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
+            <img src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
               onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
-              alt="Logotipo CNS"
-            >
+              alt="Logotipo CNS">
           </div>
         </div>
 
         <!-- Barra de Navegação das 4 Abas Administrativas -->
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 no-print">
-          <ul class="nav nav-tabs ccb-nav-tabs border-0" id="adminTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link active" id="tab-btn-dashboard" data-bs-toggle="tab" data-bs-target="#tab-dashboard" type="button" role="tab">
-                <i class="bi bi-bar-chart-line-fill me-1"></i>1. Dashboards &amp; Indicadores
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link" id="tab-btn-eventos" data-bs-toggle="tab" data-bs-target="#tab-eventos" type="button" role="tab">
-                <i class="bi bi-calendar3-event me-1"></i>2. Gestão de Eventos
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link" id="tab-btn-inscricoes" data-bs-toggle="tab" data-bs-target="#tab-inscricoes" type="button" role="tab">
-                <i class="bi bi-people-fill me-1"></i>3. Gestão de Inscrições
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link" id="tab-btn-checkin" data-bs-toggle="tab" data-bs-target="#tab-checkin" type="button" role="tab">
-                <i class="bi bi-qr-code-scan me-1"></i>4. Terminal de Check-in (Recepção)
-              </button>
-            </li>
-          </ul>
+        <div class="ccb-admin-toolbar d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 no-print">
+          <div class="ccb-tabs-scroller" role="region" aria-label="Abas do Painel Administrativo">
+            <ul class="nav nav-tabs ccb-nav-tabs border-0" id="adminTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-btn-dashboard" data-bs-toggle="tab"
+                  data-bs-target="#tab-dashboard" type="button" role="tab">
+                  <i class="bi bi-bar-chart-line-fill me-1"></i><span>Dashboards</span>
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-btn-eventos" data-bs-toggle="tab" data-bs-target="#tab-eventos"
+                  type="button" role="tab">
+                  <i class="bi bi-calendar3-event me-1"></i><span>Eventos</span>
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-btn-inscricoes" data-bs-toggle="tab" data-bs-target="#tab-inscricoes"
+                  type="button" role="tab">
+                  <i class="bi bi-people-fill me-1"></i><span>Inscrições</span>
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-btn-funcoes" data-bs-toggle="tab" data-bs-target="#tab-funcoes"
+                  type="button" role="tab">
+                  <i class="bi bi-person-vcard-fill me-1"></i><span>Funções</span>
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-btn-checkin" data-bs-toggle="tab" data-bs-target="#tab-checkin"
+                  type="button" role="tab">
+                  <i class="bi bi-qr-code-scan me-1"></i><span>Recepção QR</span>
+                </button>
+              </li>
+            </ul>
+          </div>
 
-          <div class="d-flex align-items-center gap-2">
-            <button type="button" id="btn-admin-refresh" class="btn btn-sm btn-ccb-slate" title="Sincronizar com Google Sheets">
-              <i class="bi bi-arrow-repeat me-1"></i>Atualizar Dados
+          <div class="ccb-admin-actions d-flex align-items-center gap-2">
+            <button type="button" id="btn-admin-refresh" class="btn btn-sm btn-ccb-slate"
+              title="Sincronizar com Google Sheets">
+              <i class="bi bi-arrow-repeat me-1"></i>Atualizar
             </button>
-            <button type="button" id="btn-admin-logout" class="btn btn-sm btn-ccb-danger" title="Encerrar sessão administrativa">
+            <button type="button" id="btn-admin-logout" class="btn btn-sm btn-ccb-danger"
+              title="Encerrar sessão administrativa">
               <i class="bi bi-box-arrow-right me-1"></i>Sair
             </button>
           </div>
@@ -833,15 +865,11 @@
               <div class="col-lg-7">
                 <div id="card-chart-cidades" class="ccb-card h-100">
                   <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <h3 class="fs-6 mb-0"><i class="bi bi-building me-2"></i>Distribuição por Cidade &mdash; Regional Campinas</h3>
-                    <button
-                      type="button"
-                      class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
-                      data-target-card="card-chart-cidades"
-                      data-target-canvas="chart-cidades"
-                      data-filename="Grafico_Distribuicao_Cidade_CNS"
-                      title="Exportar gráfico como imagem PNG"
-                    >
+                    <h3 class="fs-6 mb-0"><i class="bi bi-building me-2"></i>Distribuição por Cidade &mdash; Regional
+                      Campinas</h3>
+                    <button type="button" class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
+                      data-target-card="card-chart-cidades" data-target-canvas="chart-cidades"
+                      data-filename="Grafico_Distribuicao_Cidade_CNS" title="Exportar gráfico como imagem PNG">
                       <i class="bi bi-image me-1"></i>Exportar PNG
                     </button>
                   </div>
@@ -857,15 +885,11 @@
               <div class="col-lg-5">
                 <div id="card-chart-funcoes" class="ccb-card h-100">
                   <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <h3 class="fs-6 mb-0"><i class="bi bi-pie-chart-fill me-2"></i>Distribuição por Função / Ministério</h3>
-                    <button
-                      type="button"
-                      class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
-                      data-target-card="card-chart-funcoes"
-                      data-target-canvas="chart-funcoes"
-                      data-filename="Grafico_Distribuicao_Funcao_CNS"
-                      title="Exportar gráfico como imagem PNG"
-                    >
+                    <h3 class="fs-6 mb-0"><i class="bi bi-pie-chart-fill me-2"></i>Distribuição por Função / Ministério
+                    </h3>
+                    <button type="button" class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
+                      data-target-card="card-chart-funcoes" data-target-canvas="chart-funcoes"
+                      data-filename="Grafico_Distribuicao_Funcao_CNS" title="Exportar gráfico como imagem PNG">
                       <i class="bi bi-image me-1"></i>Exportar PNG
                     </button>
                   </div>
@@ -882,24 +906,18 @@
                 <div id="card-chart-anual" class="ccb-card">
                   <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <h3 class="fs-6 mb-0">
-                      <i class="bi bi-graph-up-arrow me-2"></i>Evolução Anual de Reuniões, Inscrições e Presenças &mdash; <span id="chart-anual-ano-label">Ano Atual</span>
+                      <i class="bi bi-graph-up-arrow me-2"></i>Evolução Anual de Reuniões, Inscrições e Presenças
+                      &mdash; <span id="chart-anual-ano-label">Ano Atual</span>
                     </h3>
                     <div class="d-flex flex-wrap align-items-center gap-2 no-print no-export-png">
                       <label for="chart-anual-select-ano" class="small text-white mb-0 fw-normal">Ano:</label>
-                      <select
-                        id="chart-anual-select-ano"
-                        class="form-select form-select-sm"
-                        style="width: auto; min-width: 115px; font-size: 0.78rem; padding-top: 0.2rem; padding-bottom: 0.2rem;"
-                      >
+                      <select id="chart-anual-select-ano" class="form-select form-select-sm"
+                        style="width: auto; min-width: 115px; font-size: 0.78rem; padding-top: 0.2rem; padding-bottom: 0.2rem;">
                       </select>
-                      <button
-                        type="button"
-                        class="btn btn-ccb-header-export js-btn-export-png"
-                        data-target-card="card-chart-anual"
-                        data-target-canvas="chart-anual"
+                      <button type="button" class="btn btn-ccb-header-export js-btn-export-png"
+                        data-target-card="card-chart-anual" data-target-canvas="chart-anual"
                         data-filename="Grafico_Anual_Inscricoes_Presencas_CNS"
-                        title="Exportar gráfico anual como imagem PNG"
-                      >
+                        title="Exportar gráfico anual como imagem PNG">
                         <i class="bi bi-image me-1"></i>Exportar PNG
                       </button>
                     </div>
@@ -919,19 +937,16 @@
             <!-- Quadro Resumo por Cidade (Visível no Dashboard e em Impressões PDF) -->
             <div id="card-table-cidades" class="ccb-card">
               <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <h3 class="fs-6 mb-0"><i class="bi bi-table me-2"></i>Quadro Sintético por Cidade / Grupo (Regional Campinas)</h3>
-                <button
-                  type="button"
-                  class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
-                  data-target-card="card-table-cidades"
-                  data-filename="Quadro_Sintetico_Cidades_CNS"
-                  title="Exportar tabela como imagem PNG"
-                >
+                <h3 class="fs-6 mb-0"><i class="bi bi-table me-2"></i>Quadro Sintético por Cidade / Grupo (Regional
+                  Campinas)</h3>
+                <button type="button" class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
+                  data-target-card="card-table-cidades" data-filename="Quadro_Sintetico_Cidades_CNS"
+                  title="Exportar tabela como imagem PNG">
                   <i class="bi bi-image me-1"></i>Exportar PNG
                 </button>
               </div>
-              <div class="table-responsive">
-                <table class="table ccb-table mb-0">
+              <div class="table-responsive" tabindex="0" role="region" aria-label="Quadro Sintético por Cidade">
+                <table class="table ccb-table ccb-table-analytics mb-0">
                   <thead>
                     <tr>
                       <th>Cidade / Grupo</th>
@@ -952,19 +967,17 @@
             <!-- Quadro Analítico Agrupado por Cidade e Função / Ministério -->
             <div id="card-table-cidades-funcoes" class="ccb-card mt-4">
               <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <h3 class="fs-6 mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Quadro Analítico por Cidade e Função / Ministério (Regional Campinas)</h3>
-                <button
-                  type="button"
-                  class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
-                  data-target-card="card-table-cidades-funcoes"
-                  data-filename="Quadro_Cidade_Funcao_CNS"
-                  title="Exportar tabela como imagem PNG"
-                >
+                <h3 class="fs-6 mb-0"><i class="bi bi-diagram-3-fill me-2"></i>Quadro Analítico por Cidade e Função /
+                  Ministério (Regional Campinas)</h3>
+                <button type="button" class="btn btn-ccb-header-export js-btn-export-png no-print no-export-png"
+                  data-target-card="card-table-cidades-funcoes" data-filename="Quadro_Cidade_Funcao_CNS"
+                  title="Exportar tabela como imagem PNG">
                   <i class="bi bi-image me-1"></i>Exportar PNG
                 </button>
               </div>
-              <div class="table-responsive">
-                <table class="table ccb-table mb-0">
+              <div class="table-responsive" tabindex="0" role="region"
+                aria-label="Quadro Analítico por Cidade e Função">
+                <table class="table ccb-table ccb-table-analytics ccb-table-grouped mb-0">
                   <thead>
                     <tr>
                       <th>Cidade / Grupo</th>
@@ -990,15 +1003,12 @@
           <div class="tab-pane fade" id="tab-eventos" role="tabpanel" aria-labelledby="tab-btn-eventos">
             <div id="card-table-eventos" class="ccb-card">
               <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <h3 class="fs-5 mb-0"><i class="bi bi-calendar3-event me-2"></i>Gestão de Reuniões e QR Code de Auto-Credenciamento</h3>
+                <h3 class="fs-5 mb-0"><i class="bi bi-calendar3-event me-2"></i>Gestão de Reuniões e QR Code de
+                  Auto-Credenciamento</h3>
                 <div class="d-flex flex-wrap align-items-center gap-2 no-print no-export-png">
-                  <button
-                    type="button"
-                    class="btn btn-ccb-header-export js-btn-export-png"
-                    data-target-card="card-table-eventos"
-                    data-filename="Tabela_Reunioes_CNS"
-                    title="Exportar tabela de reuniões como imagem PNG"
-                  >
+                  <button type="button" class="btn btn-ccb-header-export js-btn-export-png"
+                    data-target-card="card-table-eventos" data-filename="Tabela_Reunioes_CNS"
+                    title="Exportar tabela de reuniões como imagem PNG">
                     <i class="bi bi-image me-1"></i>Exportar PNG
                   </button>
                   <button type="button" id="btn-novo-evento" class="btn btn-sm btn-light fw-bold">
@@ -1009,8 +1019,13 @@
               <div class="p-3">
                 <div class="alert alert-light border small mb-3 no-export-png">
                   <i class="bi bi-qr-code text-primary me-1"></i>
-                  <strong>Dica de Recepção:</strong> Clique no botão <span class="badge bg-success"><i class="bi bi-qr-code me-1"></i>QR Code do Evento</span>
-                  na linha da reunião ativa para gerar o cartaz/link exclusivo de <strong>Auto-Credenciamento Online</strong> para que os próprios participantes escaneiem na entrada.
+                  <strong>Dica de Recepção:</strong> Clique no botão
+                  <span
+                    class="badge bg-success"
+                    title="Gerar QR Code e Link de Auto-Credenciamento do Evento"
+                  ><i class="bi bi-qr-code"></i></span>
+                  (QR Code do Evento) na linha da reunião ativa para gerar o cartaz/link exclusivo de
+                  <strong>Auto-Credenciamento Online</strong> para que os próprios participantes escaneiem na entrada.
                 </div>
                 <div class="table-responsive">
                   <table class="table ccb-table ccb-table-mobile-cards mb-0">
@@ -1040,15 +1055,12 @@
           <div class="tab-pane fade" id="tab-inscricoes" role="tabpanel" aria-labelledby="tab-btn-inscricoes">
             <div id="card-table-inscricoes" class="ccb-card">
               <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <h3 class="fs-5 mb-0"><i class="bi bi-people-fill me-2"></i>Gestão de Participantes Credenciados (INSCRICOES)</h3>
+                <h3 class="fs-5 mb-0"><i class="bi bi-people-fill me-2"></i>Gestão de Participantes Credenciados
+                  (INSCRICOES)</h3>
                 <div class="d-flex flex-wrap align-items-center gap-2 no-print no-export-png">
-                  <button
-                    type="button"
-                    class="btn btn-ccb-header-export js-btn-export-png"
-                    data-target-card="card-table-inscricoes"
-                    data-filename="Tabela_Inscricoes_CNS"
-                    title="Exportar tabela de inscritos como imagem PNG"
-                  >
+                  <button type="button" class="btn btn-ccb-header-export js-btn-export-png"
+                    data-target-card="card-table-inscricoes" data-filename="Tabela_Inscricoes_CNS"
+                    title="Exportar tabela de inscritos como imagem PNG">
                     <i class="bi bi-image me-1"></i>Exportar PNG
                   </button>
                   <button type="button" id="btn-nova-inscricao-manual" class="btn btn-sm btn-light fw-bold">
@@ -1082,7 +1094,8 @@
                   </div>
                   <div class="col-md-3">
                     <label for="ins-search-input" class="form-label small mb-1">Buscar Nome, E-mail ou UUID:</label>
-                    <input type="search" id="ins-search-input" class="form-control" placeholder="Digite para filtrar...">
+                    <input type="search" id="ins-search-input" class="form-control"
+                      placeholder="Digite para filtrar...">
                   </div>
                 </div>
               </div>
@@ -1113,7 +1126,138 @@
           </div>
 
           <!-- ===============================================================
-               ABA 4: TERMINAL DE CHECK-IN (RECEPÇÃO VIA CÂMERA QR CODE)
+               ABA 4: GESTÃO DE FUNÇÕES E MINISTÉRIOS (CRUD)
+               =============================================================== -->
+          <div class="tab-pane fade" id="tab-funcoes" role="tabpanel" aria-labelledby="tab-btn-funcoes">
+            <div class="ccb-card">
+              <div class="ccb-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                  <h3 class="fs-5 mb-0"><i class="bi bi-person-vcard-fill me-2"></i>Funções e Ministérios</h3>
+                  <div class="small text-white-50">
+                    Catálogo oficial de cargos eclesiásticos, estatutários, da CNS e colaboradores.
+                  </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 no-print mobile-stack-buttons">
+                  <button type="button" id="btn-seed-funcoes" class="btn btn-sm btn-outline-light"
+                    title="Importar catálogo complementar CCB sem duplicar funções existentes">
+                    <i class="bi bi-stars me-1"></i>Carga Institucional CCB
+                  </button>
+                  <button type="button" id="btn-nova-funcao" class="btn btn-sm btn-success fw-semibold">
+                    <i class="bi bi-plus-circle me-1"></i>Nova Função
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-3 p-md-4">
+                <!-- Faixa de KPIs do Catálogo de Funções -->
+                <div id="funcoes-kpi-strip" class="row g-2 g-md-3 mb-4">
+                  <div class="col-6 col-md-4 col-xl-2">
+                    <div class="fn-kpi-card fn-kpi-total">
+                      <span class="fn-kpi-label">Total de Funções</span>
+                      <div class="d-flex align-items-center justify-content-between">
+                        <strong id="kpi-fn-total" class="fn-kpi-value">0</strong>
+                        <i class="bi bi-layers text-secondary"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-4 col-xl-2">
+                    <div class="fn-kpi-card fn-kpi-cns">
+                      <span class="fn-kpi-label">CNS / Suprimentos</span>
+                      <div class="d-flex align-items-center justify-content-between">
+                        <strong id="kpi-fn-cns" class="fn-kpi-value">0</strong>
+                        <i class="bi bi-briefcase text-primary"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-4 col-xl-2">
+                    <div class="fn-kpi-card fn-kpi-ministerio">
+                      <span class="fn-kpi-label">Ministério</span>
+                      <div class="d-flex align-items-center justify-content-between">
+                        <strong id="kpi-fn-ministerio" class="fn-kpi-value">0</strong>
+                        <i class="bi bi-book text-dark"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-4 col-xl-2">
+                    <div class="fn-kpi-card fn-kpi-admin">
+                      <span class="fn-kpi-label">Estatutário / Adm</span>
+                      <div class="d-flex align-items-center justify-content-between">
+                        <strong id="kpi-fn-admin" class="fn-kpi-value">0</strong>
+                        <i class="bi bi-bank text-secondary"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-4 col-xl-2">
+                    <div class="fn-kpi-card fn-kpi-colab">
+                      <span class="fn-kpi-label">Colab. / Música</span>
+                      <div class="d-flex align-items-center justify-content-between">
+                        <strong id="kpi-fn-colab" class="fn-kpi-value">0</strong>
+                        <i class="bi bi-people text-success"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-6 col-md-4 col-xl-2">
+                    <div class="fn-kpi-card fn-kpi-ativas">
+                      <span class="fn-kpi-label">Ativas / Portal</span>
+                      <div class="d-flex align-items-center justify-content-between">
+                        <strong id="kpi-fn-ativas" class="fn-kpi-value text-success">0</strong>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Filtros do Catálogo de Funções -->
+                <div class="row g-3 mb-3 align-items-end">
+                  <div class="col-md-5">
+                    <label for="fn-filter-search" class="form-label mb-1">Pesquisar Função:</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light"><i class="bi bi-search text-secondary"></i></span>
+                      <input type="text" id="fn-filter-search" class="form-control"
+                        placeholder="Buscar por código (FUNC-...) ou nome...">
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="fn-filter-tipo" class="form-label mb-1">Classificação / Tipo:</label>
+                    <select id="fn-filter-tipo" class="form-select">
+                      <option value="ALL">Todos os Tipos</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label for="fn-filter-status" class="form-label mb-1">Status:</label>
+                    <select id="fn-filter-status" class="form-select">
+                      <option value="ALL">Todos</option>
+                      <option value="ATIVO">Somente Ativas</option>
+                      <option value="INATIVO">Somente Inativas</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Tabela Responsiva do Catálogo de Funções -->
+                <div class="table-responsive">
+                  <table class="table ccb-table ccb-table-mobile-cards mb-0" id="table-funcoes">
+                    <thead>
+                      <tr>
+                        <th style="width: 130px;">Código</th>
+                        <th>Função / Ministério</th>
+                        <th>Classificação</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end no-export-png" style="width: 150px;">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody id="admin-funcoes-tbody">
+                      <tr>
+                        <td colspan="5" class="text-center text-secondary py-4">Carregando funções...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===============================================================
+               ABA 5: TERMINAL DE CHECK-IN (RECEPÇÃO VIA CÂMERA QR CODE)
                =============================================================== -->
           <div class="tab-pane fade" id="tab-checkin" role="tabpanel" aria-labelledby="tab-btn-checkin">
             <div class="row g-4">
@@ -1121,7 +1265,8 @@
               <div class="col-lg-6">
                 <div class="ccb-card h-100">
                   <div class="ccb-card-header d-flex align-items-center justify-content-between">
-                    <h3 class="fs-5"><i class="bi bi-camera-video-fill me-2"></i>Leitor Óptico QR Code &mdash; Recepção</h3>
+                    <h3 class="fs-5"><i class="bi bi-camera-video-fill me-2"></i>Leitor Óptico QR Code &mdash; Recepção
+                    </h3>
                     <span id="scanner-status-badge" class="badge bg-secondary">Câmera Desligada</span>
                   </div>
                   <div class="p-4">
@@ -1140,17 +1285,43 @@
                       </div>
                     </div>
 
-                    <!-- Viewport da Câmera html5-qrcode -->
-                    <div id="qr-reader-viewport" class="mb-3 d-flex align-items-center justify-content-center text-light">
-                      <div class="text-center p-4">
-                        <i class="bi bi-qr-code-scan display-4 d-block mb-2 text-secondary"></i>
-                        <span class="small text-secondary">Clique em "Iniciar Câmera" para ler o QR Code individual do participante.</span>
+                    <!-- Aviso para navegadores internos (WhatsApp / Instagram) onde iframes bloqueiam câmera -->
+                    <div id="checkin-webview-alert" class="alert alert-warning border small mb-3 d-none">
+                      <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                      <strong>Navegador Interno Detectado:</strong> O leitor ao vivo pode ser bloqueado dentro do
+                      WhatsApp.
+                      Use o botão <strong>Foto/Câmera do Celular</strong> abaixo ou abra este link no Chrome/Safari.
+                      <div class="mt-2">
+                        <button type="button" id="btn-copy-checkin-app-url" class="btn btn-sm btn-outline-dark">
+                          <i class="bi bi-clipboard me-1"></i>Copiar Link do Sistema
+                        </button>
                       </div>
                     </div>
 
-                    <div class="d-flex flex-wrap justify-content-center gap-2 mb-4 mobile-stack-buttons">
+                    <!-- Viewport da Câmera html5-qrcode -->
+                    <div id="qr-reader-viewport"
+                      class="mb-3 d-flex align-items-center justify-content-center text-light">
+                      <div class="text-center p-4">
+                        <i class="bi bi-qr-code-scan display-4 d-block mb-2 text-secondary"></i>
+                        <span class="small text-secondary">Clique em "Iniciar Câmera" ou use "Foto / Câmera do Celular"
+                          abaixo.</span>
+                      </div>
+                    </div>
+
+                    <!-- Aviso orientativo caso a permissão da câmera ao vivo falhe no iframe/celular -->
+                    <div id="scanner-permission-help" class="alert alert-info border small mb-3 d-none">
+                      <div class="fw-bold mb-1"><i class="bi bi-camera-video-off me-1"></i>Câmera ao vivo bloqueada pelo
+                        navegador ou iframe</div>
+                      <p class="mb-2" id="scanner-permission-help-msg">
+                        Em alguns celulares Android/iOS dentro do Web App Google, o vídeo contínuo requer permissão
+                        direta. Você pode confirmar normalmente clicando em <strong>Ler por Foto / Câmera</strong> logo
+                        abaixo!
+                      </p>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-center gap-2 mb-3 mobile-stack-buttons">
                       <button type="button" id="btn-start-scanner" class="btn btn-ccb-primary">
-                        <i class="bi bi-play-circle-fill me-1"></i>Iniciar Câmera
+                        <i class="bi bi-play-circle-fill me-1"></i>Iniciar Câmera ao Vivo
                       </button>
                       <button type="button" id="btn-stop-scanner" class="btn btn-ccb-danger d-none">
                         <i class="bi bi-stop-circle-fill me-1"></i>Parar Câmera
@@ -1160,18 +1331,33 @@
                       </button>
                     </div>
 
+                    <!-- Fallback Nativo Multi-Dispositivo (Abre câmera nativa do celular ou galeria sem bloqueio de iframe) -->
+                    <div class="p-3 bg-light border rounded mb-3">
+                      <div class="small fw-bold mb-2" style="color: var(--ccb-primary);">
+                        <i class="bi bi-phone me-1"></i>Leitura Rápida via Câmera Nativa / Foto (Recomendado no
+                        Celular):
+                      </div>
+                      <input type="file" id="checkin-qr-file-input" accept="image/*" capture="environment"
+                        class="d-none">
+                      <input type="file" id="checkin-qr-gallery-input" accept="image/*" class="d-none">
+                      <div class="d-flex flex-wrap gap-2 mobile-stack-buttons">
+                        <button type="button" id="btn-scan-qr-photo" class="btn btn-ccb-success btn-sm flex-grow-1">
+                          <i class="bi bi-camera-fill me-1"></i>Fotografar QR Code com a Câmera
+                        </button>
+                        <button type="button" id="btn-scan-qr-gallery" class="btn btn-ccb-outline btn-sm">
+                          <i class="bi bi-image me-1"></i>Escolher Imagem
+                        </button>
+                      </div>
+                    </div>
+
                     <!-- Entrada Manual de Contingência por UUID -->
                     <div class="border-top pt-3">
                       <label for="checkin-manual-uuid" class="form-label small">
                         Check-in por Código UUID Manual (Contingência / Leitor USB):
                       </label>
                       <div class="input-group">
-                        <input
-                          type="text"
-                          id="checkin-manual-uuid"
-                          class="form-control"
-                          placeholder="Cole ou digite o UUID da credencial..."
-                        >
+                        <input type="text" id="checkin-manual-uuid" class="form-control"
+                          placeholder="Cole ou digite o UUID da credencial...">
                         <button type="button" id="btn-checkin-manual-submit" class="btn btn-ccb-slate">
                           <i class="bi bi-check2-square me-1"></i>Validar Código
                         </button>
@@ -1207,7 +1393,8 @@
                         </thead>
                         <tbody id="checkin-history-tbody">
                           <tr>
-                            <td colspan="4" class="text-center text-secondary py-3">Nenhuma leitura realizada nesta sessão.</td>
+                            <td colspan="4" class="text-center text-secondary py-3">Nenhuma leitura realizada nesta
+                              sessão.</td>
                           </tr>
                         </tbody>
                       </table>
@@ -1239,20 +1426,15 @@
             <input type="hidden" id="ev-id" value="">
             <div class="row g-3">
               <div class="col-md-8">
-                <label for="ev-titulo" class="form-label">Título da Reunião / Convocação <span class="text-danger">*</span></label>
-                <input
-                  type="text"
-                  id="ev-titulo"
-                  class="form-control"
-                  placeholder="Ex: 1ª Reunião Regional da CNS - Campinas/SP"
-                  required
-                  minlength="3"
-                  maxlength="160"
-                >
+                <label for="ev-titulo" class="form-label">Título da Reunião / Convocação <span
+                    class="text-danger">*</span></label>
+                <input type="text" id="ev-titulo" class="form-control"
+                  placeholder="Ex: 1ª Reunião Regional da CNS - Campinas/SP" required minlength="3" maxlength="160">
                 <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o título da reunião.</div>
               </div>
               <div class="col-md-4">
-                <label for="ev-status" class="form-label">Status da Convocação <span class="text-danger">*</span></label>
+                <label for="ev-status" class="form-label">Status da Convocação <span
+                    class="text-danger">*</span></label>
                 <select id="ev-status" class="form-select js-select2" required>
                   <option value="ATIVO">ATIVO (Aberta no Portal)</option>
                   <option value="PREVISTO">PREVISTO (Agenda Programada)</option>
@@ -1275,50 +1457,42 @@
                 <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o horário do lanche.</div>
               </div>
               <div class="col-12">
-                <label for="ev-local" class="form-label">Local / Endereço Completo <span class="text-danger">*</span></label>
-                <input
-                  type="text"
-                  id="ev-local"
-                  class="form-control"
-                  value="R. Germânia, 661 - Bonfim, Campinas - SP"
-                  placeholder="Ex: R. Germânia, 661 - Bonfim, Campinas - SP"
-                  required
-                  minlength="4"
-                  maxlength="240"
-                >
-                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o endereço completo do local.</div>
+                <label for="ev-local" class="form-label">Local / Endereço Completo <span
+                    class="text-danger">*</span></label>
+                <input type="text" id="ev-local" class="form-control" value="R. Germânia, 661 - Bonfim, Campinas - SP"
+                  placeholder="Ex: R. Germânia, 661 - Bonfim, Campinas - SP" required minlength="4" maxlength="240">
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o endereço completo do local.
+                </div>
+              </div>
+              <div class="col-12">
+                <label for="ev-complemento-local" class="form-label">
+                  Complemento do Local (Sala / Andar / Prédio)
+                  <span class="text-secondary fw-normal small">(Opcional &bull; não altera o link do mapa)</span>
+                </label>
+                <input type="text" id="ev-complemento-local" class="form-control"
+                  placeholder="Ex: Salão de Reuniões - 3º andar - Prédio anexo do Bonfim - Campinas."
+                  maxlength="240">
               </div>
               <div class="col-12">
                 <label for="ev-link-mapa" class="form-label">
-                  Link de Localização (Google Maps / Waze) <span class="text-secondary fw-normal small">(Automático pelo endereço ou personalizado)</span>
+                  Link de Localização (Google Maps / Waze) <span class="text-secondary fw-normal small">(Automático pelo
+                    endereço ou personalizado)</span>
                 </label>
                 <div class="input-group">
-                  <input
-                    type="url"
-                    id="ev-link-mapa"
-                    class="form-control"
-                    placeholder="Clique em Gerar Link ou informe manualmente a URL do mapa"
-                    maxlength="500"
-                  >
-                  <button
-                    type="button"
-                    id="btn-ev-gerar-mapa"
-                    class="btn btn-ccb-outline text-nowrap"
-                    title="Gerar link direto do Google Maps codificado a partir do endereço"
-                  >
+                  <input type="url" id="ev-link-mapa" class="form-control"
+                    placeholder="Clique em Gerar Link ou informe manualmente a URL do mapa" maxlength="500">
+                  <button type="button" id="btn-ev-gerar-mapa" class="btn btn-ccb-outline text-nowrap"
+                    title="Gerar link direto do Google Maps codificado a partir do endereço">
                     <i class="bi bi-geo-alt-fill me-1"></i>Gerar Link
                   </button>
-                  <button
-                    type="button"
-                    id="btn-ev-abrir-mapa"
-                    class="btn btn-outline-secondary text-nowrap"
-                    title="Abrir link de localização em nova aba para conferir o ponto no mapa"
-                  >
+                  <button type="button" id="btn-ev-abrir-mapa" class="btn btn-outline-secondary text-nowrap"
+                    title="Abrir link de localização em nova aba para conferir o ponto no mapa">
                     <i class="bi bi-box-arrow-up-right"></i>
                   </button>
                 </div>
                 <div id="ev-mapa-geocode-feedback" class="small mt-1 d-none"></div>
-                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe um link válido iniciando com https:// ou deixe em branco.</div>
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe um link válido iniciando com
+                  https:// ou deixe em branco.</div>
               </div>
             </div>
           </div>
@@ -1336,7 +1510,8 @@
   <!-- =====================================================================
        MODAL 2: INSERIR PARTICIPANTE MANUALMENTE (INSCRICOES)
        ===================================================================== -->
-  <div class="modal fade" id="modal-inscricao-manual" tabindex="-1" aria-labelledby="modal-ins-label" aria-hidden="true">
+  <div class="modal fade" id="modal-inscricao-manual" tabindex="-1" aria-labelledby="modal-ins-label"
+    aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content border-0 shadow">
         <div class="modal-header ccb-card-header">
@@ -1349,34 +1524,43 @@
           <div class="modal-body p-4">
             <div class="row g-3">
               <div class="col-12">
-                <label for="man-evento" class="form-label">Reunião / Convocação <span class="text-danger">*</span></label>
+                <label for="man-evento" class="form-label">Reunião / Convocação <span
+                    class="text-danger">*</span></label>
                 <select id="man-evento" class="form-select js-select2" required>
                 </select>
               </div>
               <div class="col-12">
                 <label for="man-nome" class="form-label">Nome Completo <span class="text-danger">*</span></label>
                 <input type="text" id="man-nome" class="form-control" required minlength="3" maxlength="150">
-                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o nome completo do participante.</div>
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o nome completo do participante.
+                </div>
               </div>
               <div class="col-md-6">
-                <label for="man-cidade" class="form-label">Cidade (Regional Campinas) <span class="text-danger">*</span></label>
+                <label for="man-cidade" class="form-label">Cidade (Regional Campinas) <span
+                    class="text-danger">*</span></label>
                 <select id="man-cidade" class="form-select js-select2" required>
                 </select>
               </div>
               <div class="col-md-6">
-                <label for="man-funcao" class="form-label">Função / Ministério na CNS <span class="text-danger">*</span></label>
+                <label for="man-funcao" class="form-label">Função / Ministério na CNS <span
+                    class="text-danger">*</span></label>
                 <select id="man-funcao" class="form-select js-select2" required>
                 </select>
               </div>
               <div class="col-md-6" id="wrap-man-email">
-                <label for="man-email" class="form-label">E-mail <span class="text-secondary fw-normal small">(ou Telefone *)</span></label>
-                <input type="email" id="man-email" class="form-control" placeholder="exemplo@dominio.com.br" maxlength="160">
-                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe um e-mail válido ou preencha o telefone.</div>
+                <label for="man-email" class="form-label">E-mail <span class="text-secondary fw-normal small">(ou
+                    Telefone *)</span></label>
+                <input type="email" id="man-email" class="form-control" placeholder="exemplo@dominio.com.br"
+                  maxlength="160">
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe um e-mail válido ou preencha o
+                  telefone.</div>
               </div>
               <div class="col-md-6" id="wrap-man-telefone">
-                <label for="man-telefone" class="form-label">Telefone / Celular <span class="text-secondary fw-normal small">(ou E-mail *)</span></label>
+                <label for="man-telefone" class="form-label">Telefone / Celular <span
+                    class="text-secondary fw-normal small">(ou E-mail *)</span></label>
                 <input type="tel" id="man-telefone" class="form-control" placeholder="(19) 99999-9999" maxlength="20">
-                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o telefone com DDD ou preencha o e-mail.</div>
+                <div class="error-msg"><span aria-hidden="true">&#9888;</span> Informe o telefone com DDD ou preencha o
+                  e-mail.</div>
               </div>
               <div class="col-md-6">
                 <label for="man-presenca" class="form-label">Situação de Presença Inicial</label>
@@ -1449,24 +1633,23 @@
         <div class="modal-body p-4 text-center" id="evento-poster-printable">
           <div class="poster-brand-stack d-flex flex-column align-items-center gap-2 mb-3">
             <div class="ccb-report-logos">
-              <img
-                src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
+              <img src="https://lh3.googleusercontent.com/d/13etuen5crQ5e66EVMRJp4cHrYWRXsREM=w400"
                 onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=13etuen5crQ5e66EVMRJp4cHrYWRXsREM&sz=w400';"
-                alt="Logotipo CCB"
-              >
+                alt="Logotipo CCB">
               <span class="ccb-logo-divider"></span>
-              <img
-                src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
+              <img src="https://lh3.googleusercontent.com/d/11cfotJKM6DCDD3HUk99kboHWLHG2v0ah=w400"
                 onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=11cfotJKM6DCDD3HUk99kboHWLHG2v0ah&sz=w400';"
-                alt="Logotipo CNS"
-              >
+                alt="Logotipo CNS">
             </div>
             <span class="badge-ccb-ativo d-inline-block">AUTO CHECK-IN ONLINE &bull; CNS CAMPINAS</span>
           </div>
 
           <div class="poster-event-meta">
             <h3 id="poster-ev-titulo" class="fs-4 mb-2" style="color: var(--ccb-primary);">—</h3>
-            <p id="poster-ev-info" class="small text-secondary mb-3">—</p>
+            <p id="poster-ev-info" class="small text-secondary mb-1">—</p>
+            <p id="poster-ev-complemento" class="small fw-semibold text-secondary mb-3 d-none">
+              <i class="bi bi-door-open me-1"></i><span></span>
+            </p>
           </div>
 
           <div id="poster-qr-canvas" class="qr-canvas-box poster-qr-wrapper my-2"></div>
@@ -1481,7 +1664,8 @@
           </div>
 
           <div class="poster-print-footer d-none">
-            Congregação Cristã no Brasil (CCB) &mdash; Regional Campinas/SP &bull; Comissão de Negociadores de Suprimentos (CNS)
+            Congregação Cristã no Brasil (CCB) &mdash; Regional Campinas/SP &bull; Comissão de Negociadores de
+            Suprimentos (CNS)
           </div>
 
           <div class="text-start bg-light border rounded p-3 w-100 no-print">
@@ -1524,7 +1708,9 @@
         <div class="modal-body p-4">
           <div class="alert alert-light border small mb-3">
             <i class="bi bi-info-circle-fill me-1 text-primary"></i>
-            Selecione o modelo oficial de mensagem da <strong>CNS — Regional Campinas</strong>, revise ou complemente o texto abaixo se desejar e clique em <strong>Abrir no WhatsApp Web / App</strong> para selecionar o grupo <strong>CNS - Campinas</strong>.
+            Selecione o modelo oficial de mensagem da <strong>CNS — Regional Campinas</strong>, revise ou complemente o
+            texto abaixo se desejar e clique em <strong>Abrir no WhatsApp Web / App</strong> para selecionar o grupo
+            <strong>CNS - Campinas</strong>.
           </div>
 
           <div class="mb-3">
@@ -1532,8 +1718,10 @@
               Modelo de Mensagem Oficial (Padrão CNS Campinas):
             </label>
             <select id="wa-evento-modelo" class="form-select">
-              <option value="COMPLETA">Modelo 1: Convocação Oficial Completa (Cabeçalho CCB/CNS, Público-Alvo, Local e Link)</option>
-              <option value="LEMBRETE">Modelo 2: Lembrete Rápido — Confirmação de Presença / Preparação da Alimentação</option>
+              <option value="COMPLETA">Modelo 1: Convocação Oficial Completa (Cabeçalho CCB/CNS, Público-Alvo, Local e
+                Link)</option>
+              <option value="LEMBRETE">Modelo 2: Lembrete Rápido — Confirmação de Presença / Preparação da Alimentação
+              </option>
             </select>
           </div>
 
@@ -1541,12 +1729,8 @@
             <label for="wa-evento-mensagem" class="form-label fw-bold">
               Texto da Mensagem para o WhatsApp:
             </label>
-            <textarea
-              id="wa-evento-mensagem"
-              class="form-control font-monospace"
-              rows="13"
-              style="font-size: 0.86rem; line-height: 1.45;"
-            ></textarea>
+            <textarea id="wa-evento-mensagem" class="form-control font-monospace" rows="13"
+              style="font-size: 0.86rem; line-height: 1.45;"></textarea>
           </div>
         </div>
         <div class="modal-footer bg-light">
@@ -1562,11 +1746,70 @@
     </div>
   </div>
 
+  <!-- =====================================================================
+       MODAL 6: CRIAR / EDITAR FUNÇÃO / MINISTÉRIO (PAINEL ADMIN)
+       ===================================================================== -->
+  <div class="modal fade" id="modal-funcao" tabindex="-1" aria-labelledby="modal-funcao-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header ccb-card-header">
+          <h3 class="modal-title fs-5 text-white" id="modal-funcao-label">
+            <i class="bi bi-person-vcard-fill me-2"></i>Cadastrar Nova Função
+          </h3>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <form id="form-modal-funcao" novalidate>
+          <div class="modal-body p-4">
+            <input type="hidden" id="fn-id" value="">
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="d-flex align-items-center justify-content-between bg-light border rounded px-3 py-2 small">
+                  <span class="text-secondary fw-semibold">Código Identificador:</span>
+                  <code id="fn-codigo-preview" class="fw-bold" style="color: var(--ccb-primary);">Gerado automaticamente</code>
+                </div>
+              </div>
+              <div class="col-12">
+                <label for="fn-nome" class="form-label">Nome da Função / Ministério <span class="text-danger">*</span></label>
+                <input type="text" id="fn-nome" class="form-control"
+                  placeholder="Ex: Secretário, Tesoureiro, Negociador de Suprimentos..." required minlength="2"
+                  maxlength="120" aria-errormessage="err-fn-nome">
+                <div id="err-fn-nome" class="error-msg">
+                  <span aria-hidden="true">&#9888;</span> Informe o nome da função (mínimo de 2 caracteres).
+                </div>
+              </div>
+              <div class="col-md-7">
+                <label for="fn-tipo" class="form-label">Classificação Institucional <span class="text-danger">*</span></label>
+                <select id="fn-tipo" class="form-select" required aria-errormessage="err-fn-tipo"></select>
+                <div id="err-fn-tipo" class="error-msg">
+                  <span aria-hidden="true">&#9888;</span> Selecione a classificação institucional.
+                </div>
+              </div>
+              <div class="col-md-5">
+                <label for="fn-ativo" class="form-label">Disponibilidade</label>
+                <select id="fn-ativo" class="form-select">
+                  <option value="true">Ativa (Visível no Portal)</option>
+                  <option value="false">Inativa (Oculta no Portal)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" id="btn-save-funcao" class="btn btn-ccb-primary">
+              <i class="bi bi-save me-1"></i>Salvar Função
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Rodapé Institucional -->
   <footer class="ccb-footer no-print">
     <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div>
-        <strong>Congregação Cristã no Brasil (CCB)</strong> &mdash; Regional Campinas/SP &bull; Comissão de Negociadores de Suprimentos (CNS)
+        <strong>Congregação Cristã no Brasil (CCB)</strong> &mdash; Regional Campinas/SP &bull; Comissão de Negociadores
+        de Suprimentos (CNS)
       </div>
       <div>
         <i class="bi bi-shield-check me-1"></i>Em conformidade com a LGPD (Lei nº 13.709/2018)
@@ -1582,9 +1825,11 @@
 
   <!-- Dependências JS Externas Obrigatórias -->
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.all.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.all.min.js"
+    crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
@@ -1595,4 +1840,5 @@
   <!-- Lógica de Aplicação Cliente (ES6+) -->
   <?!= include('AppScripts') ?>
 </body>
+
 </html>
