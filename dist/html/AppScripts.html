@@ -4092,7 +4092,7 @@
       btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
 
       try {
-        const res = await runGas(
+        const res = await callServerRpc(
           'apiAdminSaveFuncao',
           AppState.admin.secret,
           payload,
@@ -4114,7 +4114,7 @@
     async function handleToggleFuncaoStatus(funcaoId, nome, currentAtivo) {
       const nextAtivo = !currentAtivo;
       try {
-        const res = await runGas(
+        const res = await callServerRpc(
           'apiAdminToggleFuncaoStatus',
           AppState.admin.secret,
           funcaoId,
@@ -4145,7 +4145,7 @@
       if (!confirm.isConfirmed) return;
 
       try {
-        const res = await runGas(
+        const res = await callServerRpc(
           'apiAdminDeleteFuncao',
           AppState.admin.secret,
           funcaoId,
@@ -4185,7 +4185,7 @@
       }
 
       try {
-        const res = await runGas(
+        const res = await callServerRpc(
           'apiAdminSeedFuncoesInstitucionais',
           AppState.admin.secret,
           AppState.admin.filterEventoId
@@ -5090,6 +5090,7 @@
 
       const formModalFuncao = document.getElementById('form-modal-funcao');
       if (formModalFuncao) {
+        FormAccessibilityBridge.bindForm(formModalFuncao);
         formModalFuncao.addEventListener('submit', handleSaveFuncaoSubmit);
       }
 

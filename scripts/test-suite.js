@@ -648,6 +648,11 @@ function runTests() {
     false,
     'Referência a símbolo exclusivo de backend detectada em AppScripts.html'
   );
+  assert.strictEqual(
+    /\brunGas\s*\(/.test(appScriptsHtml),
+    false,
+    'Chamada inválida a runGas() detectada em AppScripts.html (use callServerRpc)'
+  );
   console.log('✓ [10/10] Deduplicação atômica, lote no Sheets e auditoria estática do frontend aprovados.');
 
   // Teste 11: CRUD dinâmico de Funções / Ministérios (aba FUNCOES) + Carga Institucional CCB
