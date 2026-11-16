@@ -537,16 +537,16 @@
         <!-- Quando há evento ativo -->
         <div id="selfcheckin-active-card" class="ccb-card d-none">
           <div class="ccb-card-header d-flex align-items-center justify-content-between">
-            <h2 class="fs-5"><i class="bi bi-phone-vibrate-fill me-2"></i>Auto-Credenciamento Online (Check-in)</h2>
+            <h2 class="fs-5 mb-0"><i class="bi bi-phone-vibrate-fill me-2"></i>Auto-Credenciamento Online (Check-in)</h2>
             <span id="sc-header-status-badge" class="badge-ccb-ativo">RECEPÇÃO ONLINE</span>
           </div>
           <div class="ccb-card-subheader">
             Confirme sua presença na reunião diretamente pelo seu celular (liberado 1h antes do evento)
           </div>
 
-          <div class="p-4">
-            <!-- Resumo do Evento Ativo -->
-            <div class="bg-light border rounded p-3 mb-4">
+          <div class="p-3 p-md-4">
+            <!-- Resumo do Evento Ativo (Compacto para Mobile) -->
+            <div class="bg-light border rounded p-3 mb-3">
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
                   <span class="ccb-info-label mb-0">Reunião / Convocação Ativa</span>
@@ -593,70 +593,128 @@
               </div>
             </div>
 
-            <!-- 1. Cartão de Auto-Detecção (Conta Google Logada ou Credencial Salva no Aparelho) -->
-            <div id="sc-auto-detected-box" class="auto-match-card mb-4 d-none">
-              <div class="d-flex align-items-start gap-3">
-                <i class="bi bi-person-check-fill fs-2" style="color: var(--ccb-green-dark);"></i>
-                <div class="flex-grow-1">
-                  <span id="sc-auto-source-badge" class="badge bg-success mb-1">Conta Google Identificada</span>
-                  <h4 id="sc-auto-nome" class="fs-5 mb-1">—</h4>
-                  <p id="sc-auto-detalhes" class="small text-secondary mb-2">—</p>
-                  <div id="sc-auto-already-msg" class="small fw-bold text-success mb-2 d-none">
-                    <i class="bi bi-check-all me-1"></i>Sua presença já está registrada para esta reunião!
+            <!-- 1. Tela de Escolha de Entrada (Mobile First - Sem Poluição Visual) -->
+            <div id="sc-entry-choice-box" class="d-none">
+              <div class="text-center mb-3">
+                <span class="ccb-info-label text-uppercase mb-1" style="letter-spacing: 0.05em;">Recepção no Local da Reunião</span>
+                <h4 class="fs-6 fw-bold mb-1" style="color: var(--ccb-primary);">Como você deseja se identificar?</h4>
+                <p class="small text-secondary mb-0">Selecione uma opção para continuar:</p>
+              </div>
+
+              <div class="d-flex flex-column gap-3 mb-2">
+                <!-- Opção A: Apenas Confirmar Presença (Já Inscrito) -->
+                <div class="sc-choice-card" id="btn-sc-choice-confirm" role="button" tabindex="0">
+                  <div class="sc-choice-icon-wrap sc-icon-checkin">
+                    <i class="bi bi-check2-circle"></i>
                   </div>
-                  <div class="d-flex flex-wrap gap-2 mobile-stack-buttons">
-                    <button type="button" id="btn-sc-oneclick-confirm" class="btn btn-ccb-success">
-                      <i class="bi bi-check2-circle me-1"></i>Confirmar Minha Presença Agora
-                    </button>
-                    <button type="button" id="btn-sc-not-me" class="btn btn-sm btn-outline-secondary">
-                      Não sou eu / Confirmar por Telefone
-                    </button>
+                  <div class="sc-choice-body">
+                    <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                      <span class="sc-choice-title">Apenas Confirmar Presença</span>
+                      <span id="sc-badge-choice-confirm" class="badge bg-success text-white small px-2 py-1">Já Inscrito</span>
+                    </div>
+                    <p id="sc-desc-choice-confirm" class="sc-choice-desc mb-0">
+                      Para quem já realizou a inscrição antecipada. Validação rápida por telefone ou 1 clique.
+                    </p>
+                  </div>
+                  <div class="sc-choice-arrow">
+                    <i class="bi bi-chevron-right"></i>
+                  </div>
+                </div>
+
+                <!-- Opção B: Registrar-se e Confirmar Presença (Inscrição no Local) -->
+                <div class="sc-choice-card" id="btn-sc-choice-register" role="button" tabindex="0">
+                  <div class="sc-choice-icon-wrap sc-icon-register">
+                    <i class="bi bi-pencil-square"></i>
+                  </div>
+                  <div class="sc-choice-body">
+                    <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                      <span class="sc-choice-title">Registrar-se e Confirmar Presença</span>
+                      <span class="badge bg-primary text-white small px-2 py-1">No Local</span>
+                    </div>
+                    <p class="sc-choice-desc mb-0">
+                      Não realizou inscrição antecipada? Cadastre seus dados e confirme a presença na hora.
+                    </p>
+                  </div>
+                  <div class="sc-choice-arrow">
+                    <i class="bi bi-chevron-right"></i>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- 2. Formulário de Confirmação Manual Segura (Apenas por Telefone) -->
-            <div id="sc-manual-form-box">
-              <h4 class="fs-6 mb-2">
-                <i class="bi bi-telephone-check text-primary me-1"></i>Confirmação por Telefone / Celular
-              </h4>
-              <p class="small text-secondary mb-3 pretty-text">
-                Informe o número de <strong>Telefone / Celular com DDD</strong> cadastrado na inscrição para validar
-                seus dados e confirmar sua presença:
-              </p>
+            <!-- 2. Painel de Confirmação de Presença (Após selecionar "Apenas Confirmar Presença") -->
+            <div id="sc-flow-confirm-box" class="d-none">
+              <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                <button type="button" id="btn-sc-back-to-choice" class="btn btn-sm btn-link text-decoration-none p-0 fw-semibold" style="color: var(--ccb-primary);">
+                  <i class="bi bi-arrow-left me-1"></i>Voltar às opções
+                </button>
+                <span class="badge bg-light text-secondary border small">Validação de Presença</span>
+              </div>
 
-              <form id="form-self-checkin" novalidate>
-                <div class="row g-3 align-items-start">
-                  <div class="col-12" id="wrap-sc-telefone">
-                    <label for="sc-telefone" class="form-label">
-                      Telefone / Celular com DDD <span class="text-danger">*</span>
-                    </label>
-                    <input type="tel" id="sc-telefone" class="form-control" placeholder="(19) 99999-9999" maxlength="20"
-                      autocomplete="tel" required aria-errormessage="err-sc-telefone">
-                    <div id="err-sc-telefone" class="error-msg">
-                      <span aria-hidden="true">&#9888;</span> Informe o telefone/celular completo com DDD cadastrado na
-                      inscrição.
+              <!-- Cartão de Auto-Detecção (Conta Google Logada ou Credencial Salva no Aparelho) -->
+              <div id="sc-auto-detected-box" class="auto-match-card mb-3 d-none">
+                <div class="d-flex align-items-start gap-3">
+                  <i class="bi bi-person-check-fill fs-2" style="color: var(--ccb-green-dark);"></i>
+                  <div class="flex-grow-1">
+                    <span id="sc-auto-source-badge" class="badge bg-success mb-1">Conta Google Identificada</span>
+                    <h4 id="sc-auto-nome" class="fs-5 mb-1">—</h4>
+                    <p id="sc-auto-detalhes" class="small text-secondary mb-2">—</p>
+                    <div id="sc-auto-already-msg" class="small fw-bold text-success mb-2 d-none">
+                      <i class="bi bi-check-all me-1"></i>Sua presença já está registrada para esta reunião!
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mobile-stack-buttons">
+                      <button type="button" id="btn-sc-oneclick-confirm" class="btn btn-ccb-success">
+                        <i class="bi bi-check2-circle me-1"></i>Confirmar Minha Presença Agora
+                      </button>
+                      <button type="button" id="btn-sc-not-me" class="btn btn-sm btn-outline-secondary">
+                        Não sou eu / Confirmar por Telefone
+                      </button>
                     </div>
                   </div>
-
-                  <div class="col-12 d-grid mt-3">
-                    <button type="submit" class="btn btn-ccb-primary btn-lg">
-                      <i class="bi bi-check2-circle me-2"></i>Validar Dados e Confirmar Minha Presença
-                    </button>
-                  </div>
                 </div>
-              </form>
-            </div>
+              </div>
 
-            <!-- 3. Opção para quem ainda não se inscreveu -->
-            <div id="sc-not-registered-footer" class="border-top mt-4 pt-3 text-center">
-              <p class="small text-secondary mb-2">
-                Ainda não realizou sua inscrição prévia para esta reunião?
-              </p>
-              <button type="button" id="btn-sc-register-and-checkin" class="btn btn-ccb-outline btn-sm">
-                <i class="bi bi-person-plus me-1"></i>Fazer Inscrição e Confirmar Presença Agora
-              </button>
+              <!-- Formulário de Confirmação Manual Segura (Apenas por Telefone) -->
+              <div id="sc-manual-form-box">
+                <h4 class="fs-6 mb-2">
+                  <i class="bi bi-telephone-check text-primary me-1"></i>Confirmação por Telefone / Celular
+                </h4>
+                <p class="small text-secondary mb-3 pretty-text">
+                  Informe o número de <strong>Telefone / Celular com DDD</strong> cadastrado na inscrição:
+                </p>
+
+                <form id="form-self-checkin" novalidate>
+                  <div class="row g-3 align-items-start">
+                    <div class="col-12" id="wrap-sc-telefone">
+                      <label for="sc-telefone" class="form-label">
+                        Telefone / Celular com DDD <span class="text-danger">*</span>
+                      </label>
+                      <input type="tel" id="sc-telefone" class="form-control" placeholder="(19) 99999-9999" maxlength="20"
+                        autocomplete="tel" required aria-errormessage="err-sc-telefone">
+                      <div id="err-sc-telefone" class="error-msg">
+                        <span aria-hidden="true">&#9888;</span> Informe o telefone/celular completo com DDD cadastrado na
+                        inscrição.
+                      </div>
+                    </div>
+
+                    <div class="col-12 d-grid mt-3">
+                      <button type="submit" class="btn btn-ccb-primary btn-lg">
+                        <i class="bi bi-check2-circle me-2"></i>Validar Dados e Confirmar Minha Presença
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Alternativa no rodapé para quem não localizou o cadastro -->
+              <div id="sc-not-registered-footer" class="border-top mt-3 pt-3 text-center">
+                <p class="small text-secondary mb-1">
+                  Não localizou sua inscrição prévia?
+                </p>
+                <button type="button" id="btn-sc-register-and-checkin" class="btn btn-sm btn-link text-decoration-none fw-bold" style="color: var(--ccb-primary);">
+                  <i class="bi bi-person-plus me-1"></i>Fazer Inscrição e Confirmar Presença Agora
+                </button>
+              </div>
             </div>
           </div>
         </div>

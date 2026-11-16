@@ -1562,6 +1562,41 @@
     /* ========================================================================
      * ROTA 2: AUTO-CREDENCIAMENTO ONLINE DO PARTICIPANTE (SELF CHECK-IN)
      * ======================================================================== */
+    /**
+     * Alterna suavemente entre as telas internas do Auto-Credenciamento (Check-in).
+     * @param {'choice' | 'confirm' | 'manual_phone'} step
+     */
+    function setSelfCheckinStep(step) {
+      const choiceBox = document.getElementById('sc-entry-choice-box');
+      const confirmFlowBox = document.getElementById('sc-flow-confirm-box');
+      const autoBox = document.getElementById('sc-auto-detected-box');
+      const manualBox = document.getElementById('sc-manual-form-box');
+
+      if (step === 'choice') {
+        if (choiceBox) choiceBox.classList.remove('d-none');
+        if (confirmFlowBox) confirmFlowBox.classList.add('d-none');
+      } else if (step === 'confirm') {
+        if (choiceBox) choiceBox.classList.add('d-none');
+        if (confirmFlowBox) confirmFlowBox.classList.remove('d-none');
+        if (AppState.portal.autoMatchCandidate) {
+          if (autoBox) autoBox.classList.remove('d-none');
+          if (manualBox) manualBox.classList.add('d-none');
+        } else {
+          if (autoBox) autoBox.classList.add('d-none');
+          if (manualBox) manualBox.classList.remove('d-none');
+          const phoneInput = document.getElementById('sc-telefone');
+          if (phoneInput) setTimeout(() => phoneInput.focus(), 120);
+        }
+      } else if (step === 'manual_phone') {
+        if (choiceBox) choiceBox.classList.add('d-none');
+        if (confirmFlowBox) confirmFlowBox.classList.remove('d-none');
+        if (autoBox) autoBox.classList.add('d-none');
+        if (manualBox) manualBox.classList.remove('d-none');
+        const phoneInput = document.getElementById('sc-telefone');
+        if (phoneInput) setTimeout(() => phoneInput.focus(), 120);
+      }
+    }
+
     async function renderSelfCheckinView() {
       const emptyCard = document.getElementById('selfcheckin-empty-card');
       const activeCard = document.getElementById('selfcheckin-active-card');
@@ -1593,6 +1628,8 @@
       }
 
       const lockedBox = document.getElementById('sc-locked-window-box');
+      const choiceBox = document.getElementById('sc-entry-choice-box');
+      const confirmFlowBox = document.getElementById('sc-flow-confirm-box');
       const autoBox = document.getElementById('sc-auto-detected-box');
       const manualBox = document.getElementById('sc-manual-form-box');
       const footerNotReg = document.getElementById('sc-not-registered-footer');
@@ -1613,6 +1650,8 @@
           dtEl.textContent = `${win.releaseDateBr} às ${win.releaseTime}h`;
         }
         if (lockedBox) lockedBox.classList.remove('d-none');
+        if (choiceBox) choiceBox.classList.add('d-none');
+        if (confirmFlowBox) confirmFlowBox.classList.add('d-none');
         if (autoBox) autoBox.classList.add('d-none');
         if (manualBox) manualBox.classList.add('d-none');
         if (footerNotReg) footerNotReg.classList.add('d-none');
@@ -1625,6 +1664,20 @@
       }
       if (lockedBox) lockedBox.classList.add('d-none');
       if (footerNotReg) footerNotReg.classList.remove('d-none');
+
+      // Exibe a tela de escolha inicial limpa (Mobile First)
+      setSelfCheckinStep('choice');
+
+      const badgeChoiceConfirm = document.getElementById('sc-badge-choice-confirm');
+      const descChoiceConfirm = document.getElementById('sc-desc-choice-confirm');
+      if (badgeChoiceConfirm) {
+        badgeChoiceConfirm.textContent = 'Já Inscrito';
+        badgeChoiceConfirm.className = 'badge bg-success text-white small px-2 py-1';
+      }
+      if (descChoiceConfirm) {
+        descChoiceConfirm.textContent =
+          'Para quem já realizou a inscrição prévia. Validação rápida por telefone ou 1 clique.';
+      }
 
       // Verifica automaticamente Conta Google logada ou Credencial salva no aparelho
       const savedUuid = getDeviceCredential(ev.ID_EVENTO);
@@ -1643,12 +1696,14 @@
         if (matchRes && matchRes.found && matchRes.candidate) {
           showAutoDetectedParticipant(matchRes.candidate, matchRes.source);
         } else {
-          document.getElementById('sc-auto-detected-box').classList.add('d-none');
-          document.getElementById('sc-manual-form-box').classList.remove('d-none');
+          AppState.portal.autoMatchCandidate = null;
+          AppState.portal.autoMatchSource = null;
+          if (autoBox) autoBox.classList.add('d-none');
         }
       } catch (_) {
-        document.getElementById('sc-auto-detected-box').classList.add('d-none');
-        document.getElementById('sc-manual-form-box').classList.remove('d-none');
+        AppState.portal.autoMatchCandidate = null;
+        AppState.portal.autoMatchSource = null;
+        if (autoBox) autoBox.classList.add('d-none');
       }
     }
 
@@ -1661,30 +1716,44 @@
       AppState.portal.autoMatchCandidate = candidate;
       AppState.portal.autoMatchSource = source;
 
-      const box = document.getElementById('sc-auto-detected-box');
       const badge = document.getElementById('sc-auto-source-badge');
       const nomeEl = document.getElementById('sc-auto-nome');
       const detEl = document.getElementById('sc-auto-detalhes');
       const alreadyMsg = document.getElementById('sc-auto-already-msg');
       const btnConfirm = document.getElementById('btn-sc-oneclick-confirm');
 
-      badge.textContent =
-        source === 'GOOGLE_ACCOUNT'
-          ? `Conta Google Reconhecida (${candidate.EMAIL_MASKED || 'Logado'})`
-          : 'Credencial deste Aparelho Reconhecida';
-
-      nomeEl.textContent = candidate.NOME_COMPLETO;
-      detEl.textContent = `${candidate.CIDADE} • ${candidate.FUNCAO}`;
-
-      if (candidate.PRESENCA_CONFIRMADA) {
-        alreadyMsg.classList.remove('d-none');
-        btnConfirm.innerHTML = '<i class="bi bi-qr-code me-1"></i>Visualizar Meu Comprovante de Presença';
-      } else {
-        alreadyMsg.classList.add('d-none');
-        btnConfirm.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Confirmar Minha Presença Agora (1 Clique)';
+      if (badge) {
+        badge.textContent =
+          source === 'GOOGLE_ACCOUNT'
+            ? `Conta Google Reconhecida (${candidate.EMAIL_MASKED || 'Logado'})`
+            : 'Credencial deste Aparelho Reconhecida';
       }
 
-      box.classList.remove('d-none');
+      if (nomeEl) nomeEl.textContent = candidate.NOME_COMPLETO;
+      if (detEl) detEl.textContent = `${candidate.CIDADE} • ${candidate.FUNCAO}`;
+
+      if (alreadyMsg && btnConfirm) {
+        if (candidate.PRESENCA_CONFIRMADA) {
+          alreadyMsg.classList.remove('d-none');
+          btnConfirm.innerHTML = '<i class="bi bi-qr-code me-1"></i>Visualizar Meu Comprovante de Presença';
+        } else {
+          alreadyMsg.classList.add('d-none');
+          btnConfirm.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Confirmar Minha Presença Agora (1 Clique)';
+        }
+      }
+
+      // Atualiza o cartão de escolha da tela inicial para fornecer feedback de 1 clique
+      const badgeChoiceConfirm = document.getElementById('sc-badge-choice-confirm');
+      const descChoiceConfirm = document.getElementById('sc-desc-choice-confirm');
+      if (badgeChoiceConfirm) {
+        badgeChoiceConfirm.textContent = '1 Toque Disponível';
+        badgeChoiceConfirm.className = 'badge bg-success text-white small px-2 py-1';
+      }
+      if (descChoiceConfirm) {
+        const primeiroNome = String(candidate.NOME_COMPLETO || '').split(' ')[0] || 'Participante';
+        descChoiceConfirm.textContent =
+          `Olá, ${primeiroNome}! Inscrição prévia reconhecida. Toque para confirmar em 1 clique.`;
+      }
     }
 
     /**
@@ -4678,6 +4747,39 @@
       document.getElementById('btn-sc-empty-portal').addEventListener('click', () => {
         switchView('portal');
       });
+
+      // Seletor de Entrada do Check-in (Escolha entre Confirmar ou Inscrever-se no Local)
+      const btnChoiceConfirm = document.getElementById('btn-sc-choice-confirm');
+      if (btnChoiceConfirm) {
+        btnChoiceConfirm.addEventListener('click', () => setSelfCheckinStep('confirm'));
+        btnChoiceConfirm.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setSelfCheckinStep('confirm');
+          }
+        });
+      }
+
+      const btnChoiceRegister = document.getElementById('btn-sc-choice-register');
+      if (btnChoiceRegister) {
+        btnChoiceRegister.addEventListener('click', () => {
+          AppState.portal.lastVoucher = null;
+          switchView('portal', { instantCheckInMode: true });
+        });
+        btnChoiceRegister.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            AppState.portal.lastVoucher = null;
+            switchView('portal', { instantCheckInMode: true });
+          }
+        });
+      }
+
+      const btnBackChoice = document.getElementById('btn-sc-back-to-choice');
+      if (btnBackChoice) {
+        btnBackChoice.addEventListener('click', () => setSelfCheckinStep('choice'));
+      }
+
       document.getElementById('btn-sc-register-and-checkin').addEventListener('click', () => {
         AppState.portal.lastVoucher = null;
         switchView('portal', { instantCheckInMode: true });
@@ -4708,10 +4810,7 @@
       // Botões de Auto-Detecção no Self Check-in
       document.getElementById('btn-sc-oneclick-confirm').addEventListener('click', handleOneClickSelfCheckin);
       document.getElementById('btn-sc-not-me').addEventListener('click', () => {
-        document.getElementById('sc-auto-detected-box').classList.add('d-none');
-        document.getElementById('sc-manual-form-box').classList.remove('d-none');
-        const phoneInput = document.getElementById('sc-telefone');
-        if (phoneInput) phoneInput.focus();
+        setSelfCheckinStep('manual_phone');
       });
 
       // Máscara de telefone nos inputs de inscrição completa e auto check-in
