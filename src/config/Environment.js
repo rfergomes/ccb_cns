@@ -95,7 +95,6 @@ const Environment = (() => {
    */
   const CIDADES_REGIONAL_CAMPINAS = Object.freeze([
     'Campinas',
-    'Cosmópolis',
     'Hortolândia',
     'Indaiatuba',
     'Monte Mor',
@@ -103,8 +102,7 @@ const Environment = (() => {
     'Paulínia',
     'Sumaré',
     'Valinhos',
-    'Vinhedo',
-    'Negociadores'
+    'Vinhedo'
   ]);
 
   /**
