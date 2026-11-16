@@ -716,9 +716,67 @@ function runTests() {
     'ALL'
   );
   assert.strictEqual(secondSeedRes.addedCount, 0);
-  console.log('✓ [11/11] CRUD completo de Funções e Carga Institucional CCB aprovados.\n');
+  console.log('✓ [11/12] CRUD completo de Funções e Carga Institucional CCB aprovados.');
 
-  console.log('Todos os 11 cenários de teste automatizados passaram com sucesso!');
+  // Teste 12: Encerramento automático de eventos anteriores ao dia de hoje (DATA_EVENTO < today)
+  // Cria evento no passado com status PREVISTO
+  const evPassadoPrevisto = gasGlobalContext.apiAdminSaveEvento(
+    mockPropertiesStore.ADMIN_SECRET,
+    {
+      TITULO: 'Reunião CNS Regional Passada',
+      DATA_EVENTO: '2020-05-10',
+      HORA_EVENTO: '15:00',
+      HORA_LANCHE: '14:30',
+      LOCAL: 'Campinas/SP',
+      STATUS: 'PREVISTO'
+    },
+    'ALL'
+  );
+
+  // Valida que ao carregar o bundle, o evento com data no passado já é automaticamente encerrado
+  const ev1NoBundle = evPassadoPrevisto.bundle.eventos.find(
+    (e) => e.ID_EVENTO === evPassadoPrevisto.evento.ID_EVENTO
+  );
+  assert.strictEqual(ev1NoBundle.STATUS, 'ENCERRADO');
+
+  // Simula diretamente na planilha a existência de reuniões legadas que ficaram como ATIVO/PREVISTO
+  const mockSheetEventos = mockSpreadsheetsDb.get(mockPropertiesStore.SPREADSHEET_ID).getSheetByName('EVENTOS');
+  const lastRowEv = mockSheetEventos.getLastRow();
+  // Insere uma reunião simulada com data de ontem e status PREVISTO
+  mockSheetEventos.getRange(lastRowEv + 1, 1, 1, 9).setValues([[
+    '550e8400-e29b-41d4-a716-999999999001',
+    'Reunião Legada Não Encerrada',
+    '2020-05-14',
+    '15:00',
+    '14:30',
+    'Campinas/SP',
+    'PREVISTO',
+    '',
+    ''
+  ]]);
+
+  // Executa a rotina de auto-encerramento via RPC administrativa
+  const autoCloseRes = gasGlobalContext.apiAdminEncerrarEventosPassados(
+    mockPropertiesStore.ADMIN_SECRET,
+    'ALL'
+  );
+  assert.strictEqual(autoCloseRes.success, true);
+  assert.ok(autoCloseRes.totalEncerrados >= 1);
+  assert.ok(autoCloseRes.titulos.includes('Reunião Legada Não Encerrada'));
+
+  // Valida que no bundle administrativo a reunião legada agora aparece com STATUS = 'ENCERRADO'
+  const evLegadaAfter = autoCloseRes.bundle.eventos.find(
+    (e) => e.ID_EVENTO === '550e8400-e29b-41d4-a716-999999999001'
+  );
+  assert.strictEqual(evLegadaAfter.STATUS, 'ENCERRADO');
+
+  // Valida que a rotina autônoma (executada pelo Apps Script / trigger diário) roda com sucesso
+  const rotinaResult = gasGlobalContext.rotinaAutoEncerrarEventosPassados();
+  assert.strictEqual(typeof rotinaResult.totalEncerrados, 'number');
+
+  console.log('✓ [12/12] Encerramento automático de eventos anteriores ao dia de hoje aprovado.\n');
+
+  console.log('Todos os 12 cenários de teste automatizados passaram com sucesso!');
 }
 
 runTests();

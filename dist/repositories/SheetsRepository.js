@@ -438,6 +438,57 @@ class SheetsRepository {
   }
 
   /**
+   * Encerra automaticamente todos os eventos cuja DATA_EVENTO seja anterior à data informada (ou hoje),
+   * e cujo STATUS atual não seja ENCERRADO (ou seja, ATIVO ou PREVISTO).
+   * Executa em lote atômico (batch update) para alta performance na planilha.
+   *
+   * @param {string} [todayDateStr] Data de referência em formato 'YYYY-MM-DD'. Se omitido, usa a data atual.
+   * @returns {{totalEncerrados: number, titulos: Array<string>}} Resumo das reuniões encerradas.
+   */
+  autoClosePastEventos(todayDateStr) {
+    const today = todayDateStr || SecurityUtils.getTodayDateString();
+    return this.withWriteLock_(() => {
+      const sheet = this.ensureTable_(
+        Environment.TABLES.EVENTOS.NAME,
+        Environment.TABLES.EVENTOS.COLUMNS
+      );
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) {
+        return { totalEncerrados: 0, titulos: [] };
+      }
+
+      const numCols = Environment.TABLES.EVENTOS.COLUMNS.length;
+      const values = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+      let hasChanges = false;
+      const titulos = [];
+
+      for (let i = 0; i < values.length; i++) {
+        const row = values[i];
+        const idEvento = String(row[0] || '').trim();
+        if (!idEvento) continue;
+
+        const dataEvento = SecurityUtils.normalizeDateString(row[2]);
+        const status = String(row[6] || '').trim().toUpperCase();
+
+        if (dataEvento && dataEvento < today && status !== Environment.EVENT_STATUS.ENCERRADO) {
+          row[6] = Environment.EVENT_STATUS.ENCERRADO;
+          titulos.push(String(row[1] || idEvento).trim());
+          hasChanges = true;
+        }
+      }
+
+      if (hasChanges) {
+        sheet.getRange(2, 1, values.length, numCols).setNumberFormat('@').setValues(values);
+      }
+
+      return {
+        totalEncerrados: titulos.length,
+        titulos
+      };
+    });
+  }
+
+  /**
    * Remove um evento pelo seu UUID (ID_EVENTO) e opcionalmente exclui inscrições vinculadas.
    * @param {string} idEvento UUID do evento.
    * @param {boolean} [cascadeInscricoes=true] Se verdadeiro, remove inscrições vinculadas.

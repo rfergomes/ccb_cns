@@ -406,6 +406,33 @@ function apiAdminSeedFuncoesInstitucionais(adminSecret, currentFilterId) {
 }
 
 /**
+ * Encerra automaticamente todas as reuniões anteriores à data de hoje.
+ *
+ * @param {string} adminSecret Segredo administrativo.
+ * @param {string} [currentFilterId='ALL'] Filtro atual do dashboard.
+ * @returns {Object} Resultado e bundle atualizado.
+ */
+function apiAdminEncerrarEventosPassados(adminSecret, currentFilterId) {
+  const adminService = new AdminService();
+  return adminService.autoClosePastEventosAndGetBundle(adminSecret, currentFilterId || 'ALL');
+}
+
+/**
+ * Rotina autônoma de encerramento automático de eventos passados.
+ * Pode ser acionada diretamente no editor do Apps Script ou agendada
+ * como Acionador por Tempo (Time-driven Trigger diário) para rodar toda madrugada.
+ *
+ * @returns {Object} Resumo com total e títulos encerrados.
+ */
+function rotinaAutoEncerrarEventosPassados() {
+  const repo = new SheetsRepository();
+  repo.ensureDatabaseSchema();
+  const res = repo.autoClosePastEventos();
+  Logger.log('Rotina de encerramento automático concluída: ' + JSON.stringify(res));
+  return res;
+}
+
+/**
  * Função utilitária de provisionamento inicial (executável apenas no editor do Apps Script)
  * para garantir a criação das tabelas EVENTOS, INSCRICOES e FUNCOES na planilha configurada.
  */

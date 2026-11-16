@@ -4955,6 +4955,54 @@
       // Botão Nova Reunião
       document.getElementById('btn-novo-evento').addEventListener('click', () => openEventoModal(null));
 
+      // Botão Encerrar Eventos Anteriores à Data de Hoje
+      const btnAutoClosePast = document.getElementById('btn-admin-auto-close-past');
+      if (btnAutoClosePast) {
+        btnAutoClosePast.addEventListener('click', async () => {
+          const confirmResult = await Swal.fire({
+            title: 'Encerrar Eventos Anteriores a Hoje?',
+            text: 'Deseja alterar automaticamente para ENCERRADO todas as reuniões com data anterior ao dia de hoje?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#033D60',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sim, Encerrar Eventos',
+            cancelButtonText: 'Cancelar'
+          });
+
+          if (!confirmResult.isConfirmed) return;
+
+          try {
+            setLoading(true, 'Encerrando reuniões com datas anteriores a hoje...');
+            const res = await callServerRpc(
+              'apiAdminEncerrarEventosPassados',
+              AppState.admin.secret,
+              AppState.admin.filterEventoId
+            );
+            setLoading(false);
+
+            if (res.bundle) {
+              applyAdminBundle(res.bundle);
+            }
+
+            if (res.totalEncerrados > 0) {
+              Swal.fire({
+                title: 'Eventos Encerrados!',
+                text: res.message,
+                icon: 'success',
+                confirmButtonColor: '#033D60'
+              });
+              toastr.success(res.message);
+            } else {
+              toastr.info(res.message);
+            }
+          } catch (err) {
+            setLoading(false);
+            toastr.error(err.message || 'Erro ao encerrar eventos passados.');
+          }
+        });
+      }
+
       // Automação de Link de Localização (Nominatim / OpenStreetMap -> Google Maps) no Modal de Evento
       const btnGerarMapa = document.getElementById('btn-ev-gerar-mapa');
       if (btnGerarMapa) {

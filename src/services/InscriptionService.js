@@ -39,6 +39,8 @@ class InscriptionService {
     this.repository_.ensureDatabaseSchema();
 
     const today = SecurityUtils.getTodayDateString();
+    this.repository_.autoClosePastEventos(today);
+
     const allEventos = this.repository_.findAllEventos();
 
     const activeEvents = allEventos

@@ -41,6 +41,9 @@ class AdminService {
     SecurityUtils.assertAdminAuthorized(adminSecret);
     this.repository_.ensureDatabaseSchema();
 
+    const today = SecurityUtils.getTodayDateString();
+    this.repository_.autoClosePastEventos(today);
+
     const eventos = this.repository_
       .findAllEventos()
       .sort((a, b) => {
@@ -395,6 +398,35 @@ class AdminService {
     return {
       success: true,
       message: `Reunião excluída com sucesso (${result.deletedInscricoesCount} inscrição(ões) vinculada(s) removida(s)).`
+    };
+  }
+
+  /**
+   * Encerra todos os eventos cuja data seja anterior a hoje e retorna o bundle atualizado.
+   *
+   * @param {string} adminSecret Chave administrativa.
+   * @param {string} [filterEventoId='ALL'] Filtro ativo de reuniões.
+   * @returns {{success: boolean, message: string, totalEncerrados: number, titulos: Array<string>, bundle: Object}}
+   */
+  autoClosePastEventosAndGetBundle(adminSecret, filterEventoId = 'ALL') {
+    SecurityUtils.assertAdminAuthorized(adminSecret);
+    this.repository_.ensureDatabaseSchema();
+
+    const today = SecurityUtils.getTodayDateString();
+    const result = this.repository_.autoClosePastEventos(today);
+    const bundle = this.getAdminDataBundle(adminSecret, filterEventoId);
+
+    const msg =
+      result.totalEncerrados > 0
+        ? `${result.totalEncerrados} reunião(ões) anterior(es) a hoje foram encerradas automaticamente: ${result.titulos.join(', ')}.`
+        : 'Nenhuma reunião anterior a hoje precisava de encerramento.';
+
+    return {
+      success: true,
+      message: msg,
+      totalEncerrados: result.totalEncerrados,
+      titulos: result.titulos,
+      bundle
     };
   }
 
